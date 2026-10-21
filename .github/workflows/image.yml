@@ -1,0 +1,33 @@
+# L5, the image (testing/20): an image built with this layer, on the project's own runner — a hosted one
+# holds neither the downloads nor the shared state an image build needs. Every command is a script under ci/.
+name: image
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# One image build at a time: they share the runner's downloads and shared state.
+concurrency: image
+
+jobs:
+  image:
+    # A change from a fork would run its own code on the runner's host, so it is never built here.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, linux, yocto]
+    timeout-minutes: 720
+    steps:
+      - uses: actions/checkout@v7
+      - uses: extractions/setup-just@v4
+        with:
+          just-version: 1.58.0
+      - run: just develop
+      - run: ci/image-run.sh
+      - run: ci/record.sh L5 > record-L5.json
+        if: always()
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: record-L5
+          path: record-L5.json
