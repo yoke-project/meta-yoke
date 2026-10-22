@@ -15,7 +15,7 @@ jobs:
   image:
     # A change from a fork would run its own code on the runner's host, so it is never built here.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, linux, yocto]
+    runs-on: [self-hosted, linux, yoke]
     timeout-minutes: 720
     steps:
       - uses: actions/checkout@v7
