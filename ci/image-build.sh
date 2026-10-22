@@ -75,9 +75,15 @@ check_an_image_builds_offline_once_fetched() {
     build="$(build_for "$machine")"
     log="$cache/logs/$machine-fetch.log"
     # Fetching is bound by the host's link, not its processors: a few downloads at a time leave the
-    # runner's own connection to the forge room, which a download per processor starved.
-    bitbake_in "$build" env BB_NUMBER_THREADS="${YOKE_FETCH_THREADS:-2}" bitbake --runall=fetch "$target" > "$log" 2>&1 \
-      || { why+=" $machine does not fetch: $(grep -m2 ERROR "$log");"; continue; }
+    # runner's own connection to the forge room, which a download per processor starved. A fetch keeps
+    # what it already has, so one interrupted by the link is performed again, a few times, before it fails.
+    local tries="${YOKE_FETCH_TRIES:-3}" try fetched=""
+    for (( try = 1; try <= tries; try++ )); do
+      if bitbake_in "$build" env BB_NUMBER_THREADS="${YOKE_FETCH_THREADS:-2}" bitbake --runall=fetch "$target" > "$log" 2>&1; then
+        fetched=1; break
+      fi
+    done
+    [[ -n "$fetched" ]] || { why+=" $machine does not fetch after $tries tries: $(grep -m2 ERROR "$log");"; continue; }
     log="$cache/logs/$machine-build.log"
     bitbake_in "$build" env BB_NO_NETWORK=1 bitbake "$target" > "$log" 2>&1 \
       || { why+=" $machine does not build offline: $(grep -m3 ERROR "$log");"; continue; }
