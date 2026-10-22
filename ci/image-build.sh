@@ -51,7 +51,7 @@ bitbake_in() {
   local build="$1"; shift
   # shellcheck disable=SC1091
   (cd "$build" && export BBPATH="$build" PATH="$cache/layers/bitbake/bin:$PATH" PYTHONPATH="$cache/layers/bitbake/lib" \
-     BB_ENV_PASSTHROUGH_ADDITIONS="BB_NO_NETWORK" && "$@")
+     BB_ENV_PASSTHROUGH_ADDITIONS="BB_NO_NETWORK BB_NUMBER_THREADS" && "$@")
 }
 
 first="$(build_for "${machines[0]}")"
@@ -74,7 +74,9 @@ check_an_image_builds_offline_once_fetched() {
   for machine in "${machines[@]}"; do
     build="$(build_for "$machine")"
     log="$cache/logs/$machine-fetch.log"
-    bitbake_in "$build" bitbake --runall=fetch "$target" > "$log" 2>&1 \
+    # Fetching is bound by the host's link, not its processors: a few downloads at a time leave the
+    # runner's own connection to the forge room, which a download per processor starved.
+    bitbake_in "$build" env BB_NUMBER_THREADS="${YOKE_FETCH_THREADS:-2}" bitbake --runall=fetch "$target" > "$log" 2>&1 \
       || { why+=" $machine does not fetch: $(grep -m2 ERROR "$log");"; continue; }
     log="$cache/logs/$machine-build.log"
     bitbake_in "$build" env BB_NO_NETWORK=1 bitbake "$target" > "$log" 2>&1 \
