@@ -82,3 +82,16 @@
 | **Precondition** | a `yoke-verify` on `PATH` whose build information names `github.com/yoke-project/yoke` at `v9.9.9` and a revision, and the results a run leaves |
 | **Action** | run `ci/record.sh` |
 | **Expected** | the tool is asked to write the record with `--ran yoke-verify=v9.9.9@` and the revision's first twelve characters — the version the binary states, and nothing learnt from where it was installed |
+
+## meta-yoke:the-published-tool.07 — where `PATH` does not reach the tool, `develop` hands its directory to the steps after it
+
+| Field | Value |
+| --- | --- |
+| **Cites** | prj_structure/95 §Continuous integration · prj_structure/95 §The verbs |
+| **Level** | L1 |
+| **Method** | check |
+| **Not applicable in** | — |
+| **Label** | blocking |
+| **Precondition** | a release manifest naming `yoke-verify` `9.9.9` with its archive, a user `bin` directory that `PATH` does not reach, and a path file of continuous integration named by `GITHUB_PATH` |
+| **Action** | run `just develop "" 9.9.9` against them, once with the path file and once without |
+| **Expected** | with the path file, it exits zero, the user `bin` directory is the file's last line, and `develop` says the steps after it reach the tool; without one, it exits non-zero saying that `PATH` does not reach the directory — a self-hosted runner needs no step of its own to put the directory on `PATH` |

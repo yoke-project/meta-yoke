@@ -22,8 +22,6 @@ jobs:
       - uses: extractions/setup-just@v4
         with:
           just-version: 1.58.0
-      # A hosted runner has ~/.local/bin on PATH, where `just develop` puts yoke-verify; this one does not.
-      - run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - run: just develop
       - run: ci/image-run.sh
       - run: ci/record.sh L5 > record-L5.json

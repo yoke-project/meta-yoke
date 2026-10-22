@@ -45,6 +45,13 @@ tar -xzf "$work/$archive" -C "$work" yoke-verify
 mkdir -p "$bin"
 install -m 0755 "$work/yoke-verify" "$bin/yoke-verify"
 
+# A runner whose PATH does not reach the directory names a path file; the steps after this one have the
+# directory at the head of their PATH.
+if [[ ":$PATH:" != *":$bin:"* && -n "${GITHUB_PATH:-}" ]]; then
+  echo "$bin" >> "$GITHUB_PATH"
+  echo "develop: yoke-verify $version is in $bin, and the steps after this one reach it — $taken"
+  exit 0
+fi
 found="$(command -v yoke-verify || true)"
 if [[ -z "$found" ]]; then
   echo "develop: yoke-verify $version is in $bin, which PATH does not reach"
