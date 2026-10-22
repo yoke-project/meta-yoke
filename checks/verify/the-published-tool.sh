@@ -133,3 +133,29 @@ check_the_record_names_the_tool_by_its_build_information() {
   rm -rf "$dir"
   return "$status"
 }
+
+# std: meta-yoke:the-published-tool.07
+check_develop_hands_its_directory_to_the_steps_after_it() {
+  local dir out status=0
+  dir="$(mktemp -d)"
+  published_tool_release "$dir" 9.9.9
+  : > "$dir/path-file"
+  # A PATH that reaches the commands develop runs and no yoke-verify installed on this machine.
+  local path
+  path="$(dirname "$(command -v just)"):/usr/bin:/bin"
+  if ! out="$(cd "$root" && YOKE_MANIFEST="file://$dir/manifest.jsonl" YOKE_DOWNLOADS="file://$dir" \
+    XDG_BIN_HOME="$dir/bin" PATH="$path" GITHUB_PATH="$dir/path-file" just develop "" 9.9.9 2>&1)"; then
+    echo "develop failed with a path file: $out"; status=1
+  elif [[ "$(tail -n 1 "$dir/path-file")" != "$dir/bin" ]]; then
+    echo "the path file does not end with the user's bin directory: $out"; status=1
+  elif ! grep -q "the steps after this one reach it" <<<"$out"; then
+    echo "develop does not say the steps after it reach the tool: $out"; status=1
+  elif out="$(cd "$root" && YOKE_MANIFEST="file://$dir/manifest.jsonl" YOKE_DOWNLOADS="file://$dir" \
+    XDG_BIN_HOME="$dir/bin" PATH="$path" GITHUB_PATH= just develop "" 9.9.9 2>&1)"; then
+    echo "develop passed with no path file and PATH not reaching the tool: $out"; status=1
+  elif ! grep -q "which PATH does not reach" <<<"$out"; then
+    echo "develop does not say PATH does not reach the tool: $out"; status=1
+  fi
+  rm -rf "$dir"
+  return "$status"
+}
