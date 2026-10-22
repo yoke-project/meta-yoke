@@ -35,7 +35,7 @@ with the runner.
 An image is built with `ci/image.sh [machine ...]` — `qemux86-64` and `qemuarm64` unless named — which needs
 Podman and keeps the layers' checkouts, the downloads and the shared state under `~/.cache/meta-yoke`
 (or `YOKE_YOCTO_CACHE`). A cold build of both machines takes hours and tens of gigabytes. Continuous
-integration runs it on a self-hosted runner labelled `yocto`, for every push to `main` and for a proposed
+integration runs it on a self-hosted runner labelled `yoke`, for every push to `main` and for a proposed
 change from this repository, never from a fork.
 
 ## Where the depth is
