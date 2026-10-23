@@ -87,7 +87,7 @@ check_an_image_builds_offline_once_fetched() {
     log="$cache/logs/$machine-build.log"
     bitbake_in "$build" env BB_NO_NETWORK=1 bitbake "$target" > "$log" 2>&1 \
       || { why+=" $machine does not build offline: $(grep -m3 ERROR "$log");"; continue; }
-    ls "$build/tmp/deploy/images/$machine/$target-$machine".rootfs*.ext4 > /dev/null 2>&1 \
+    ls "$build/tmp/deploy/images/$machine/$target-$machine".rootfs*.ext4* > /dev/null 2>&1 \
       || why+=" $machine built no root filesystem;"
   done
   [[ -z "$why" ]] || { echo "${why# }"; return 1; }
