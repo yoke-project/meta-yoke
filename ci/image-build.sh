@@ -108,28 +108,42 @@ check_an_image_builds_offline_once_fetched() {
   [[ -z "$why" ]] || { echo "${why# }"; return 1; }
 }
 
-# files_of <machine> <package>: the files a package of the machine's build holds, one per line.
-files_of() { bitbake_in "$cache/build-$1" oe-pkgdata-util list-pkg-files "$2" 2> /dev/null | sed -n 's/^[[:space:]]*//p' | grep '^/'; }
+# unpack <machine> <package> <dir>: the package the machine's build deployed, unpacked under <dir>, whose
+# files the cases read; the work directories are gone once a recipe is built (rm_work), the package is not.
+unpack() {
+  local ipk
+  ipk="$(compgen -G "$cache/build-$1/tmp/deploy/ipk/*/$2_*.ipk" | head -1)"
+  [[ -n "$ipk" ]] || return 1
+  mkdir -p "$3/root" && (cd "$3" && ar x "$ipk" && tar -xf data.tar.* -C root)
+}
+# files_of <dir>: the files of an unpacked package, as they are installed, one per line.
+files_of() { (cd "$1/root" && find . \( -type f -o -type l \) | sed 's#^\.##'); }
 
 # std: meta-yoke:the-yoke-recipe.02
 check_yokes_recipe_builds_its_packages() {
-  local why="" machine package expect held program arch
+  local why="" machine package rest expect held dir arch
   for machine in "${machines[@]}"; do
     [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
     case "$machine" in qemux86-64) arch="x86-64" ;; qemuarm64) arch="aarch64" ;; *) arch="" ;; esac
     for expect in "yoke-core /usr/bin/yoke-core" "yoke /usr/bin/yoke" "yoke-guardian /usr/bin/yoke-guardian" \
                   "yoke-auth /usr/bin/yoke-auth" "yoke-compose /usr/bin/yoke-compose" "yoke-conformance /usr/bin/yoke-conformance" \
-                  "yoke-packaging /usr/lib/systemd/system/yoke.service /usr/lib/tmpfiles.d/yoke.conf /usr/lib/sysusers.d/yoke.conf /etc/yoke/core.yaml"; do
+                  "yoke-packaging /usr/lib/systemd/system/yoke.service /usr/lib/systemd/system-preset/98-yoke-packaging.preset /usr/lib/tmpfiles.d/yoke.conf /usr/lib/sysusers.d/yoke.conf /etc/yoke/core.yaml"; do
       read -r package rest <<<"$expect"
-      held="$(files_of "$machine" "$package" | sort | tr '\n' ' ')"
+      dir="$(mktemp -d)"
+      if ! unpack "$machine" "$package" "$dir"; then why+=" $machine built no package $package;"; rm -rf "$dir"; continue; fi
+      held="$(files_of "$dir" | sort | tr '\n' ' ')"
       [[ "$held" == "$(tr ' ' '\n' <<<"$rest" | sort | tr '\n' ' ')" ]] || why+=" $machine's $package holds [${held% }], want [$rest];"
+      # The Core, the manager and the tools are static; yoke-auth opens libpam when it runs, and is not.
+      if [[ "$package" == yoke-auth ]]; then
+        file "$dir/root$rest" | grep -q "$arch" && file "$dir/root$rest" | grep -q "dynamically linked" \
+          || why+=" $machine's $package is not a dynamically linked program for $arch;"
+      elif [[ "$package" != yoke-packaging ]]; then
+        file "$dir/root$rest" | grep -q "$arch" && file "$dir/root$rest" | grep -q "statically linked" \
+          || why+=" $machine's $package is not a static program for $arch;"
+      fi
+      rm -rf "$dir"
     done
-    for program in yoke-core yoke yoke-guardian yoke-auth yoke-compose yoke-conformance; do
-      held="$(compgen -G "$cache/build-$machine/tmp/work/*/yoke/*/packages-split/*/usr/bin/$program" | head -1)"
-      [[ -n "$held" ]] && file "$held" | grep -q "$arch" && file "$held" | grep -q "statically linked" \
-        || why+=" $machine's $program is not a static program for $arch;"
-    done
-    compgen -G "$cache/build-$machine/tmp/work/*/yoke/*/packages-split/*/usr/bin/yoke-verify" > /dev/null \
+    compgen -G "$cache/build-$machine/tmp/deploy/ipk/*/yoke-verify_*.ipk" > /dev/null \
       && why+=" $machine packages yoke-verify;"
   done
   [[ -z "$why" ]] || { echo "${why# }"; return 1; }
