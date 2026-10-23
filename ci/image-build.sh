@@ -149,9 +149,51 @@ check_yokes_recipe_builds_its_packages() {
   [[ -z "$why" ]] || { echo "${why# }"; return 1; }
 }
 
+# family_lacks <family> <library>: what a library family's recipe did not build for each machine — its
+# static development package holding the library for the machine's architecture, its development package
+# holding the headers, the CMake configuration and the pkg-config file, and no program in any package.
+family_lacks() {
+  local family="$1" library="$2" why="" machine dir arch held file object
+  for machine in "${machines[@]}"; do
+    [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
+    case "$machine" in qemux86-64) arch="x86-64" ;; qemuarm64) arch="aarch64" ;; *) arch="" ;; esac
+    dir="$(mktemp -d)"
+    if ! unpack "$machine" "$family-dev" "$dir/dev" || ! unpack "$machine" "$family-staticdev" "$dir/static"; then
+      why+=" $machine built no development packages of $family;"; rm -rf "$dir"; continue
+    fi
+    held="$(files_of "$dir/dev")"
+    grep -q '^/usr/include/yoke/.*\.h$' <<<"$held" || why+=" $machine's $family-dev holds no public header;"
+    for file in "/usr/lib/cmake/$family/$family-config.cmake" "/usr/lib/cmake/$family/$family-config-version.cmake" \
+                "/usr/lib/cmake/$family/$family-targets.cmake" "/usr/lib/pkgconfig/$family.pc"; do
+      grep -qxF "$file" <<<"$held" || why+=" $machine's $family-dev does not hold $file;"
+    done
+    [[ "$(files_of "$dir/static")" == "/usr/lib/$library.a" ]] \
+      || why+=" $machine's $family-staticdev holds [$(files_of "$dir/static" | tr '\n' ' ')], want [/usr/lib/$library.a];"
+    if [[ -f "$dir/static/root/usr/lib/$library.a" ]]; then
+      object="$(ar t "$dir/static/root/usr/lib/$library.a" | head -1)"
+      (cd "$dir/static" && ar x "root/usr/lib/$library.a" "$object")
+      file "$dir/static/$object" | grep -q "$arch" || why+=" $machine's $library is not built for $arch;"
+    fi
+    for file in $(compgen -G "$cache/build-$machine/tmp/deploy/ipk/*/${family}*_*.ipk"); do
+      rm -rf "$dir/each" && mkdir -p "$dir/each/root" && (cd "$dir/each" && ar x "$file" && tar -xf data.tar.* -C root)
+      files_of "$dir/each" | grep -qE '^/usr/(s?bin)/' && why+=" $machine's $(basename "$file") holds a program;"
+    done
+    rm -rf "$dir"
+  done
+  [[ -z "$why" ]] || { echo "${why# }"; return 1; }
+}
+
+# std: meta-yoke:the-c-and-cpp-recipes.02
+check_the_c_recipe_builds_the_library_and_what_builds_against_it() { family_lacks yoke-sdk-c libyoke-c; }
+
+# std: meta-yoke:the-c-and-cpp-recipes.03
+check_the_cpp_recipe_builds_the_library_and_what_builds_against_it() { family_lacks yoke-sdk-cpp libyoke-cpp; }
+
 for each in "meta-yoke:the-layer.04 check_the_layer_is_taken_into_a_build" \
             "meta-yoke:the-layer.05 check_an_image_builds_offline_once_fetched" \
-            "meta-yoke:the-yoke-recipe.02 check_yokes_recipe_builds_its_packages"; do
+            "meta-yoke:the-yoke-recipe.02 check_yokes_recipe_builds_its_packages" \
+            "meta-yoke:the-c-and-cpp-recipes.02 check_the_c_recipe_builds_the_library_and_what_builds_against_it" \
+            "meta-yoke:the-c-and-cpp-recipes.03 check_the_cpp_recipe_builds_the_library_and_what_builds_against_it"; do
   read -r id fn <<<"$each"
   if out="$("$fn" 2>&1)"; then say "$id" ""; else say "$id" "$out"; fi
 done
