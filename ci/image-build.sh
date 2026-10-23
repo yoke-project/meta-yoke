@@ -51,7 +51,7 @@ bitbake_in() {
   local build="$1"; shift
   # shellcheck disable=SC1091
   (cd "$build" && export BBPATH="$build" PATH="$cache/layers/bitbake/bin:$PATH" PYTHONPATH="$cache/layers/bitbake/lib" \
-     BB_ENV_PASSTHROUGH_ADDITIONS="BB_NO_NETWORK BB_NUMBER_THREADS" && "$@")
+     BB_ENV_PASSTHROUGH_ADDITIONS="BB_NO_NETWORK" && "$@")
 }
 
 first="$(build_for "${machines[0]}")"
@@ -68,33 +68,76 @@ check_the_layer_is_taken_into_a_build() {
   fi
 }
 
+# What a machine's build is asked for: the image, and every recipe of this layer, fetched once and then
+# built with the network off. Each machine's outcome is kept for the cases below to read.
+target="${YOKE_IMAGE:-core-image-minimal}"
+recipes="$(find "$layer"/recipes-* -name '*.bb' 2> /dev/null | sed -E 's#.*/([^/_]+)(_[^/]*)?\.bb$#\1#' | sort -u | tr '\n' ' ')"
+declare -A built=()
+for machine in "${machines[@]}"; do
+  build="$(build_for "$machine")"
+  log="$cache/logs/$machine-fetch.log"
+  # Fetching is bound by the host's link, not its processors: a few downloads at a time leave the
+  # runner's own connection to the forge room, which a download per processor starved. A fetch keeps
+  # what it already has, so one interrupted by the link is performed again, a few times, before it fails.
+  tries="${YOKE_FETCH_TRIES:-3}" fetched=""
+  for (( try = 1; try <= tries; try++ )); do
+    if bitbake_in "$build" env BB_NUMBER_THREADS="${YOKE_FETCH_THREADS:-2}" bitbake --runall=fetch "$target" $recipes > "$log" 2>&1; then
+      fetched=1; break
+    fi
+  done
+  if [[ -z "$fetched" ]]; then
+    built[$machine]="does not fetch after $tries tries: $(grep -m2 ERROR "$log")"
+    continue
+  fi
+  log="$cache/logs/$machine-build.log"
+  if ! bitbake_in "$build" env BB_NO_NETWORK=1 bitbake "$target" $recipes > "$log" 2>&1; then
+    built[$machine]="does not build offline: $(grep -m3 ERROR "$log")"
+    continue
+  fi
+  built[$machine]=ok
+done
+
 # std: meta-yoke:the-layer.05
 check_an_image_builds_offline_once_fetched() {
-  local target="${YOKE_IMAGE:-core-image-minimal}" why="" machine build log
+  local why="" machine build
   for machine in "${machines[@]}"; do
-    build="$(build_for "$machine")"
-    log="$cache/logs/$machine-fetch.log"
-    # Fetching is bound by the host's link, not its processors: a few downloads at a time leave the
-    # runner's own connection to the forge room, which a download per processor starved. A fetch keeps
-    # what it already has, so one interrupted by the link is performed again, a few times, before it fails.
-    local tries="${YOKE_FETCH_TRIES:-3}" try fetched=""
-    for (( try = 1; try <= tries; try++ )); do
-      if bitbake_in "$build" env BB_NUMBER_THREADS="${YOKE_FETCH_THREADS:-2}" bitbake --runall=fetch "$target" > "$log" 2>&1; then
-        fetched=1; break
-      fi
+    build="$cache/build-$machine"
+    if [[ "${built[$machine]}" != ok ]]; then why+=" $machine ${built[$machine]};"; continue; fi
+    ls "$build/tmp/deploy/images/$machine/$target-$machine".rootfs*.ext4* > /dev/null 2>&1 || why+=" $machine built no root filesystem;"
+  done
+  [[ -z "$why" ]] || { echo "${why# }"; return 1; }
+}
+
+# files_of <machine> <package>: the files a package of the machine's build holds, one per line.
+files_of() { bitbake_in "$cache/build-$1" oe-pkgdata-util list-pkg-files "$2" 2> /dev/null | sed -n 's/^[[:space:]]*//p' | grep '^/'; }
+
+# std: meta-yoke:the-yoke-recipe.02
+check_yokes_recipe_builds_its_packages() {
+  local why="" machine package expect held program arch
+  for machine in "${machines[@]}"; do
+    [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
+    case "$machine" in qemux86-64) arch="x86-64" ;; qemuarm64) arch="aarch64" ;; *) arch="" ;; esac
+    for expect in "yoke-core /usr/bin/yoke-core" "yoke /usr/bin/yoke" "yoke-guardian /usr/bin/yoke-guardian" \
+                  "yoke-auth /usr/bin/yoke-auth" "yoke-compose /usr/bin/yoke-compose" "yoke-conformance /usr/bin/yoke-conformance" \
+                  "yoke-packaging /usr/lib/systemd/system/yoke.service /usr/lib/tmpfiles.d/yoke.conf /usr/lib/sysusers.d/yoke.conf /etc/yoke/core.yaml"; do
+      read -r package rest <<<"$expect"
+      held="$(files_of "$machine" "$package" | sort | tr '\n' ' ')"
+      [[ "$held" == "$(tr ' ' '\n' <<<"$rest" | sort | tr '\n' ' ')" ]] || why+=" $machine's $package holds [${held% }], want [$rest];"
     done
-    [[ -n "$fetched" ]] || { why+=" $machine does not fetch after $tries tries: $(grep -m2 ERROR "$log");"; continue; }
-    log="$cache/logs/$machine-build.log"
-    bitbake_in "$build" env BB_NO_NETWORK=1 bitbake "$target" > "$log" 2>&1 \
-      || { why+=" $machine does not build offline: $(grep -m3 ERROR "$log");"; continue; }
-    ls "$build/tmp/deploy/images/$machine/$target-$machine".rootfs*.ext4* > /dev/null 2>&1 \
-      || why+=" $machine built no root filesystem;"
+    for program in yoke-core yoke yoke-guardian yoke-auth yoke-compose yoke-conformance; do
+      held="$(compgen -G "$cache/build-$machine/tmp/work/*/yoke/*/packages-split/*/usr/bin/$program" | head -1)"
+      [[ -n "$held" ]] && file "$held" | grep -q "$arch" && file "$held" | grep -q "statically linked" \
+        || why+=" $machine's $program is not a static program for $arch;"
+    done
+    compgen -G "$cache/build-$machine/tmp/work/*/yoke/*/packages-split/*/usr/bin/yoke-verify" > /dev/null \
+      && why+=" $machine packages yoke-verify;"
   done
   [[ -z "$why" ]] || { echo "${why# }"; return 1; }
 }
 
 for each in "meta-yoke:the-layer.04 check_the_layer_is_taken_into_a_build" \
-            "meta-yoke:the-layer.05 check_an_image_builds_offline_once_fetched"; do
+            "meta-yoke:the-layer.05 check_an_image_builds_offline_once_fetched" \
+            "meta-yoke:the-yoke-recipe.02 check_yokes_recipe_builds_its_packages"; do
   read -r id fn <<<"$each"
   if out="$("$fn" 2>&1)"; then say "$id" ""; else say "$id" "$out"; fi
 done
