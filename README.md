@@ -12,7 +12,7 @@ with its own verbs, and this layer only describes how an image integrator builds
 
 | Path | What it holds |
 | --- | --- |
-| `conf/layer.conf` | The layer's configuration: the collection `yoke`, compatible with `wrynose`, depending on `core` and `openembedded-layer` |
+| `conf/layer.conf` | The layer's configuration: the collection `yoke`, compatible with `wrynose`, depending on `core`, `openembedded-layer` and `meta-python` |
 | `checks/`, `ci/` | This repository's own checks, and the scripts continuous integration runs; `ci/image.sh` builds an image with the layer, in a build host it defines and at the revisions `ci/layers.lock` pins |
 
 The recipes will sit under `recipes-*/` directories, as the Yocto Project lays a layer out.
