@@ -189,11 +189,40 @@ check_the_c_recipe_builds_the_library_and_what_builds_against_it() { family_lack
 # std: meta-yoke:the-c-and-cpp-recipes.03
 check_the_cpp_recipe_builds_the_library_and_what_builds_against_it() { family_lacks yoke-sdk-cpp libyoke-cpp; }
 
+# std: meta-yoke:the-rust-recipe.02
+check_the_rust_recipe_builds_the_library() {
+  local why="" machine dir arch held rlib object file
+  for machine in "${machines[@]}"; do
+    [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
+    case "$machine" in qemux86-64) arch="x86-64" ;; qemuarm64) arch="aarch64" ;; *) arch="" ;; esac
+    dir="$(mktemp -d)"
+    if ! unpack "$machine" yoke-sdk-rust-dev "$dir/dev"; then
+      why+=" $machine built no development package of yoke-sdk-rust;"; rm -rf "$dir"; continue
+    fi
+    held="$(files_of "$dir/dev")"
+    rlib="$(grep -E '^/usr/lib/rustlib/[^/]+/lib/libyoke_sdk-[^/]+\.rlib$' <<<"$held" | head -1)"
+    if [[ -z "$rlib" ]]; then
+      why+=" $machine's yoke-sdk-rust-dev holds no libyoke_sdk rlib;"
+    else
+      object="$(ar t "$dir/dev/root$rlib" | grep -m1 '\.o$')"
+      (cd "$dir/dev" && ar x "root$rlib" "$object")
+      file "$dir/dev/$object" | grep -q "$arch" || why+=" $machine's libyoke_sdk is not built for $arch;"
+    fi
+    for file in $(compgen -G "$cache/build-$machine/tmp/deploy/ipk/*/yoke-sdk-rust*_*.ipk"); do
+      rm -rf "$dir/each" && mkdir -p "$dir/each/root" && (cd "$dir/each" && ar x "$file" && tar -xf data.tar.* -C root)
+      files_of "$dir/each" | grep -qE '^/usr/(s?bin)/' && why+=" $machine's $(basename "$file") holds a program;"
+    done
+    rm -rf "$dir"
+  done
+  [[ -z "$why" ]] || { echo "${why# }"; return 1; }
+}
+
 for each in "meta-yoke:the-layer.04 check_the_layer_is_taken_into_a_build" \
             "meta-yoke:the-layer.05 check_an_image_builds_offline_once_fetched" \
             "meta-yoke:the-yoke-recipe.02 check_yokes_recipe_builds_its_packages" \
             "meta-yoke:the-c-and-cpp-recipes.02 check_the_c_recipe_builds_the_library_and_what_builds_against_it" \
-            "meta-yoke:the-c-and-cpp-recipes.03 check_the_cpp_recipe_builds_the_library_and_what_builds_against_it"; do
+            "meta-yoke:the-c-and-cpp-recipes.03 check_the_cpp_recipe_builds_the_library_and_what_builds_against_it" \
+            "meta-yoke:the-rust-recipe.02 check_the_rust_recipe_builds_the_library"; do
   read -r id fn <<<"$each"
   if out="$("$fn" 2>&1)"; then say "$id" ""; else say "$id" "$out"; fi
 done
