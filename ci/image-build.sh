@@ -250,13 +250,42 @@ check_the_python_recipes_build_the_libraries() {
   [[ -z "$why" ]] || { echo "${why# }"; return 1; }
 }
 
+# std: meta-yoke:the-go-recipe.02
+check_the_go_recipe_builds_the_harnesses() {
+  local why="" machine dir arch held harness file manifest
+  for machine in "${machines[@]}"; do
+    [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
+    case "$machine" in qemux86-64) arch="x86-64" ;; qemuarm64) arch="aarch64" ;; *) arch="" ;; esac
+    dir="$(mktemp -d)"
+    if ! unpack "$machine" yoke-sdk-go "$dir/main"; then
+      why+=" $machine built no package yoke-sdk-go;"; rm -rf "$dir"; continue
+    fi
+    held="$(files_of "$dir/main")"
+    for harness in yoke-go-plugin-harness yoke-go-interface-harness yoke-go-admin-harness; do
+      if ! grep -qxF "/usr/bin/$harness" <<<"$held"; then why+=" $machine's yoke-sdk-go holds no $harness;"; continue; fi
+      file -L "$dir/main/root/usr/bin/$harness" | grep -q "$arch" || why+=" $machine's $harness is not built for $arch;"
+    done
+    for file in $(compgen -G "$cache/build-$machine/tmp/deploy/ipk/*/yoke-sdk-go*_*.ipk"); do
+      rm -rf "$dir/each" && mkdir -p "$dir/each/root" && (cd "$dir/each" && ar x "$file" && tar -xf data.tar.* -C root)
+      files_of "$dir/each" | grep -qE '^/usr/(include/|lib/.*\.(a|so)$)' && why+=" $machine's $(basename "$file") holds a library or a header;"
+    done
+    manifest="$cache/build-$machine/tmp/deploy/images/$machine/$target-$machine.rootfs.manifest"
+    if [[ ! -f "$manifest" ]]; then why+=" $machine's image has no manifest;"
+    elif grep -qE '^yoke-sdk-go' "$manifest"; then why+=" $machine's image holds $(grep -E '^yoke-sdk-go' "$manifest" | awk '{print $1}' | tr '\n' ' ');"
+    fi
+    rm -rf "$dir"
+  done
+  [[ -z "$why" ]] || { echo "${why# }"; return 1; }
+}
+
 for each in "meta-yoke:the-layer.04 check_the_layer_is_taken_into_a_build" \
             "meta-yoke:the-layer.05 check_an_image_builds_offline_once_fetched" \
             "meta-yoke:the-yoke-recipe.02 check_yokes_recipe_builds_its_packages" \
             "meta-yoke:the-c-and-cpp-recipes.02 check_the_c_recipe_builds_the_library_and_what_builds_against_it" \
             "meta-yoke:the-c-and-cpp-recipes.03 check_the_cpp_recipe_builds_the_library_and_what_builds_against_it" \
             "meta-yoke:the-rust-recipe.02 check_the_rust_recipe_builds_the_library" \
-            "meta-yoke:the-python-recipes.02 check_the_python_recipes_build_the_libraries"; do
+            "meta-yoke:the-python-recipes.02 check_the_python_recipes_build_the_libraries" \
+            "meta-yoke:the-go-recipe.02 check_the_go_recipe_builds_the_harnesses"; do
   read -r id fn <<<"$each"
   if out="$("$fn" 2>&1)"; then say "$id" ""; else say "$id" "$out"; fi
 done
