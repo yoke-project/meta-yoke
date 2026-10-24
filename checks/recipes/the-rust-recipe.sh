@@ -20,7 +20,7 @@ check_the_rust_recipe_pins_the_crate_and_its_dependencies() {
   for source in $sources; do
     [[ "$source" =~ ^crate://crates\.io/([^/]+)/([^/]+)$ ]] || { echo "the crate list fetches $source"; return 1; }
     name="${BASH_REMATCH[1]}" version="${BASH_REMATCH[2]}"
-    grep -qE "^SRC_URI\[${name//./\\.}-${version//./\\.}\.sha256sum\] = \"[0-9a-f]{64}\"$" "$dir/yoke-sdk-rust-crates.inc" \
+    grep -F "SRC_URI[$name-$version.sha256sum] = " "$dir/yoke-sdk-rust-crates.inc" | grep -qE '^[^ ]+ = "[0-9a-f]{64}"$' \
       || { echo "$name $version is not pinned by its sha256"; return 1; }
   done
 }
