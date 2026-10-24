@@ -24,9 +24,6 @@ GO_IMPORT = "github.com/yoke-project/yoke-reference"
 inherit go-mod cmake pkgconfig
 
 OECMAKE_SOURCEPATH = "${S}/clients/lvgl/panel"
-# LVGL's recipe builds its DRM driver too, whose headers include libdrm's from a directory its pkg-config file
-# does not name; LVGL's own recipes add it the same way.
-CFLAGS += "-I${STAGING_INCDIR}/libdrm"
 
 # No C in the Go programs, the dependencies from the module cache the fetch filled, and nothing fetched while
 # building.
