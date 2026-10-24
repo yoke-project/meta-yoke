@@ -278,6 +278,34 @@ check_the_go_recipe_builds_the_harnesses() {
   [[ -z "$why" ]] || { echo "${why# }"; return 1; }
 }
 
+# std: meta-yoke:the-reference-recipe.02
+check_the_reference_recipe_builds_the_host_units() {
+  local why="" machine dir arch package program held lvgl
+  for machine in "${machines[@]}"; do
+    [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
+    case "$machine" in qemux86-64) arch="x86-64" ;; qemuarm64) arch="aarch64" ;; *) arch="" ;; esac
+    for program in acquire instrument clock panel; do
+      package="yoke-reference-$program" dir="$(mktemp -d)"
+      if ! unpack "$machine" "$package" "$dir"; then why+=" $machine built no package $package;"; rm -rf "$dir"; continue; fi
+      held="$(files_of "$dir")"
+      if ! grep -qxF "/usr/libexec/yoke-reference/$program" <<<"$held"; then
+        why+=" $machine's $package holds no /usr/libexec/yoke-reference/$program;"
+      else
+        file -L "$dir/root/usr/libexec/yoke-reference/$program" | grep -q "$arch" || why+=" $machine's $program is not built for $arch;"
+      fi
+      [[ "$program" == acquire ]] && ! grep -qE '^/usr/share/yoke-reference/manifests/[^/]+\.yaml$' <<<"$held" \
+        && why+=" $machine's $package holds no Manifest;"
+      if [[ "$program" == panel && -f "$dir/root/usr/libexec/yoke-reference/panel" ]]; then
+        readelf -d "$dir/root/usr/libexec/yoke-reference/panel" | grep -q 'NEEDED.*liblvgl\.so' || why+=" $machine's panel does not link LVGL's shared library;"
+        lvgl="$(compgen -G "$cache/build-$machine/tmp/deploy/ipk/*/lvgl_*.ipk" | head -1)"
+        [[ -n "$lvgl" ]] || why+=" $machine built no package of LVGL;"
+      fi
+      rm -rf "$dir"
+    done
+  done
+  [[ -z "$why" ]] || { echo "${why# }"; return 1; }
+}
+
 for each in "meta-yoke:the-layer.04 check_the_layer_is_taken_into_a_build" \
             "meta-yoke:the-layer.05 check_an_image_builds_offline_once_fetched" \
             "meta-yoke:the-yoke-recipe.02 check_yokes_recipe_builds_its_packages" \
@@ -285,7 +313,8 @@ for each in "meta-yoke:the-layer.04 check_the_layer_is_taken_into_a_build" \
             "meta-yoke:the-c-and-cpp-recipes.03 check_the_cpp_recipe_builds_the_library_and_what_builds_against_it" \
             "meta-yoke:the-rust-recipe.02 check_the_rust_recipe_builds_the_library" \
             "meta-yoke:the-python-recipes.02 check_the_python_recipes_build_the_libraries" \
-            "meta-yoke:the-go-recipe.02 check_the_go_recipe_builds_the_harnesses"; do
+            "meta-yoke:the-go-recipe.02 check_the_go_recipe_builds_the_harnesses" \
+            "meta-yoke:the-reference-recipe.02 check_the_reference_recipe_builds_the_host_units"; do
   read -r id fn <<<"$each"
   if out="$("$fn" 2>&1)"; then say "$id" ""; else say "$id" "$out"; fi
 done
