@@ -200,7 +200,7 @@ check_the_rust_recipe_builds_the_library() {
       why+=" $machine built no development package of yoke-sdk-rust;"; rm -rf "$dir"; continue
     fi
     held="$(files_of "$dir/dev")"
-    rlib="$(grep -E '^/usr/lib/rustlib/[^/]+/lib/libyoke_sdk-[^/]+\.rlib$' <<<"$held" | head -1)"
+    rlib="$(grep -E '^/usr/lib/rustlib/[^/]+/lib/libyoke_sdk\.rlib$' <<<"$held" | head -1)"
     if [[ -z "$rlib" ]]; then
       why+=" $machine's yoke-sdk-rust-dev holds no libyoke_sdk rlib;"
     else

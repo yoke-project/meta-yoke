@@ -29,4 +29,4 @@
 | **Label** | blocking |
 | **Precondition** | the build of `the-layer.04`, for `qemux86-64` and `qemuarm64` |
 | **Action** | fetch `yoke-sdk-rust`; build it with the network off; list what its packages hold |
-| **Expected** | the development package holds the crate's library, `libyoke_sdk-*.rlib`, under the Rust library directory, with objects for the machine's architecture; and no package of the recipe holds a program — a device takes nothing from the family |
+| **Expected** | the development package holds the crate's library, `libyoke_sdk.rlib`, under the Rust library directory, with objects for the machine's architecture; and no package of the recipe holds a program — a device takes nothing from the family |
