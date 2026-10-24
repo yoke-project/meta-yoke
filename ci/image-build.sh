@@ -31,7 +31,7 @@ build_for() {
   cat > "$build/conf/bblayers.conf" <<CONF
 BBPATH = "\${TOPDIR}"
 BBFILES ?= ""
-BBLAYERS = "$cache/layers/openembedded-core/meta $cache/layers/meta-openembedded/meta-oe $layer"
+BBLAYERS = "$cache/layers/openembedded-core/meta $cache/layers/meta-openembedded/meta-oe $cache/layers/meta-openembedded/meta-python $layer"
 CONF
   cat > "$build/conf/local.conf" <<CONF
 MACHINE = "$machine"
@@ -217,12 +217,46 @@ check_the_rust_recipe_builds_the_library() {
   [[ -z "$why" ]] || { echo "${why# }"; return 1; }
 }
 
+# std: meta-yoke:the-python-recipes.02
+check_the_python_recipes_build_the_libraries() {
+  local why="" machine dir package top dist held module protobuf grpc versions file
+  # The versions the series generates with: protobuf's major, and gRPC's generator.
+  protobuf="$(compgen -G "$cache/layers/meta-openembedded/meta-python/recipes-devtools/python/python3-protobuf_*.bb" | sed -E 's/.*_([0-9]+)\..*/\1/')"
+  grpc="$(compgen -G "$cache/layers/meta-openembedded/meta-python/recipes-devtools/python/python3-grpcio-tools_*.bb" | sed -E 's/.*_(.*)\.bb$/\1/')"
+  for machine in "${machines[@]}"; do
+    [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
+    for package in "python3-yoke-sdk yoke_sdk yoke_sdk" "python3-yoke-proto yoke yoke_proto"; do
+      read -r package top dist <<<"$package"
+      dir="$(mktemp -d)"
+      if ! unpack "$machine" "$package" "$dir"; then why+=" $machine built no package $package;"; rm -rf "$dir"; continue; fi
+      held="$(files_of "$dir")"
+      grep -qE "^/usr/lib/python3\.[0-9]+/site-packages/$top/" <<<"$held" || why+=" $machine's $package holds no $top in site-packages;"
+      for file in LICENSE NOTICE; do
+        grep -qE "^/usr/lib/python3\.[0-9]+/site-packages/$dist-[^/]+\.dist-info/licenses/$file$" <<<"$held" \
+          || why+=" $machine's $package holds no $file;"
+      done
+      grep -qE '^/usr/(s?bin)/' <<<"$held" && why+=" $machine's $package holds a program;"
+      if [[ "$package" == python3-yoke-proto ]]; then
+        module="$(grep -cE '_pb2(_grpc)?\.py$' <<<"$held")"
+        (( module > 0 )) || why+=" $machine's $package holds no generated module;"
+        versions="$(cd "$dir/root" && grep -hoE '^# Protobuf Python Version: [0-9]+' $(grep -E '_pb2\.py$' <<<"$held" | sed 's#^/##') | awk '{print $NF}' | sort -u | tr '\n' ' ')"
+        [[ "$versions" == "$protobuf " ]] || why+=" $machine's definitions are generated for protobuf [$versions], the series' is $protobuf;"
+        versions="$(cd "$dir/root" && grep -hoE "^GRPC_GENERATED_VERSION = '[^']+'" $(grep -E '_pb2_grpc\.py$' <<<"$held" | sed 's#^/##') | cut -d"'" -f2 | sort -u | tr '\n' ' ')"
+        [[ "$versions" == "$grpc " ]] || why+=" $machine's definitions are generated for gRPC [$versions], the series' generator is $grpc;"
+      fi
+      rm -rf "$dir"
+    done
+  done
+  [[ -z "$why" ]] || { echo "${why# }"; return 1; }
+}
+
 for each in "meta-yoke:the-layer.04 check_the_layer_is_taken_into_a_build" \
             "meta-yoke:the-layer.05 check_an_image_builds_offline_once_fetched" \
             "meta-yoke:the-yoke-recipe.02 check_yokes_recipe_builds_its_packages" \
             "meta-yoke:the-c-and-cpp-recipes.02 check_the_c_recipe_builds_the_library_and_what_builds_against_it" \
             "meta-yoke:the-c-and-cpp-recipes.03 check_the_cpp_recipe_builds_the_library_and_what_builds_against_it" \
-            "meta-yoke:the-rust-recipe.02 check_the_rust_recipe_builds_the_library"; do
+            "meta-yoke:the-rust-recipe.02 check_the_rust_recipe_builds_the_library" \
+            "meta-yoke:the-python-recipes.02 check_the_python_recipes_build_the_libraries"; do
   read -r id fn <<<"$each"
   if out="$("$fn" 2>&1)"; then say "$id" ""; else say "$id" "$out"; fi
 done
