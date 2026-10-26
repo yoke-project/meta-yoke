@@ -316,7 +316,7 @@ check_the_reference_recipe_builds_the_host_units() {
 
 # std: meta-yoke:the-image.02
 check_the_image_holds_a_host_of_the_example() {
-  local why="" machine manifest package dir arch held program
+  local why="" machine manifest package dir arch held program runtime lib
   for machine in "${machines[@]}"; do
     [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
     case "$machine" in qemux86-64) arch="x86-64" ;; qemuarm64) arch="aarch64" ;; *) arch="" ;; esac
@@ -324,6 +324,15 @@ check_the_image_holds_a_host_of_the_example() {
     [[ -f "$manifest" ]] || { why+=" $machine's image has no manifest;"; continue; }
     for package in yoke yoke-core yoke-guardian yoke-packaging yoke-reference-instrument yoke-reference-station-device lvgl; do
       grep -qE "^$package " "$manifest" || why+=" $machine's image does not hold $package;"
+    done
+    # The panel inside the example's package links what the panel's own package does; the build computes the
+    # latter, and the example's package is to name it all.
+    runtime="$cache/build-$machine/tmp/pkgdata/$machine/runtime"
+    for lib in $(sed -n 's/^RDEPENDS:yoke-reference-panel: //p' "$runtime/yoke-reference-panel" 2> /dev/null \
+                 | sed 's/([^)]*)//g'); do
+      [[ "$lib" == glibc ]] && continue
+      sed -n 's/^RDEPENDS:yoke-reference-station-device: //p' "$runtime/yoke-reference-station-device" 2> /dev/null \
+        | grep -qw -- "$lib" || why+=" $machine's yoke-reference-station-device does not depend on $lib, which the panel links;"
     done
     held="$(grep -E '^(yoke-compose|yoke-conformance|yoke-sdk-[a-z]+) ' "$manifest" | awk '{print $1}' | tr '\n' ' ')"
     [[ -z "$held" ]] || why+=" $machine's image holds ${held% };"
@@ -371,7 +380,7 @@ check_the_image_boots_into_a_host_whose_guardian_brings_the_instance_up() {
       why+=" $machine did not boot to a login ($(fact "$machine" stopped)$(tail -2 "$cache/logs/$machine-boot.err" | tr '\n' ' ')): $(tail -c 300 "$cache/build-$machine/boot-$machine.log" 2> /dev/null | tr -d '\r' | tr '\n' ' ');"
       continue
     fi
-    for want in "first-boot success" "account yes/active" "signed-in 0" "guardian active" "core-ready yes" \
+    for want in "first-boot success" "account yes/lingering" "signed-in 0" "guardian active" "core-ready yes" \
                 "instance id:com.yoke.station.device/desired_state:running" "unit-acquire Running" "unit-panel Running"; do
       read -r name want <<<"$want"
       got="$(fact "$machine" "$name")"

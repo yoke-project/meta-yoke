@@ -24,16 +24,20 @@ def fact(name, value):
     print(f"{name} {value}", flush=True)
 
 
+# What systemd writes to a terminal around a session, and colours: neither is a command's output.
+terminal = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[A-Za-z]")
+
+
 def run(console, command, timeout=60):
-    """What a command printed on the console and its exit status, the prompt being one of the script's own."""
+    """What a command printed on the console and its exit status, the prompt being one of the script's own.
+    The terminal echoes nothing, so what comes before the status is the command's output alone."""
     console.sendline(f"{command}; echo \"status=$?\"")
     # The serial console ends a line with more than one carriage return.
     console.expect(r"status=(\d+)\r*\n", timeout=timeout)
-    out = console.before.decode(errors="replace")
+    out = terminal.sub("", console.before.decode(errors="replace")).replace("\r", "")
     status = int(console.match.group(1))
     console.expect_exact(prompt, timeout=timeout)
-    # The echo of the command is the first line.
-    return "\n".join(out.splitlines()[1:]).strip(), status
+    return out.strip(), status
 
 
 def as_account(command):
@@ -70,34 +74,42 @@ try:
     fact("login", "yes")
     console.sendline("root")
     console.expect(r"# ", timeout=60)
-    console.sendline(f"export PS1='{prompt}'")
+    # The prompt is set in two halves, so the echo of this line is not taken for it.
+    half = len(prompt) // 2
+    console.sendline(f"stty -echo; export PS1='{prompt[:half]}''{prompt[half:]}' SYSTEMD_COLORS=0 SYSTEMD_PAGER=")
     console.expect_exact(prompt, timeout=60)
 
     out, status = run(console, "systemctl is-system-running --wait", timeout=600)
     fact("system", out.splitlines()[-1] if out else "unknown")
     out, status = run(console, "systemctl show -p Result --value yoke-example-first-boot.service")
     fact("first-boot", out or "unknown")
-    out, status = run(console, "loginctl show-user " + account + " -p Linger -p State --value | tr '\\n' ' '")
-    fact("account", out.replace(" ", "/") or "unknown")
-    out, status = run(console, "who | wc -l")
+    # The account lingers: its user manager runs with no session of its own.
+    linger, _ = run(console, f"loginctl show-user {account} -p Linger --value")
+    state, _ = run(console, f"loginctl show-user {account} -p State --value")
+    fact("account", f"{linger}/{state}" if linger and state else "unknown")
+    # The user manager holds a session of its own, of the class manager; a sign-in is a session of the class user.
+    out, status = run(console, f"for s in $(loginctl show-user {account} -p Sessions --value); do "
+                               "loginctl show-session $s -p Class --value; done | grep -c '^user'")
     fact("signed-in", out or "unknown")
     out, status = run(console, as_account("systemctl --user is-active yoke-guardian.service"))
-    fact("guardian", out or "unknown")
+    fact("guardian", out.splitlines()[-1] if out else "unknown")
 
     # The guardian brings the instance up in its own time: its Core answers once it has.
     deadline = time.time() + 600
     while True:
         out, status = run(console, as_account("yoke core status --instance station")
-                          + " | grep -c '\"ready\": true'", timeout=120)
-        if out == "1" or time.time() > deadline:
+                          + " | grep -cE '\"ready\": *true'", timeout=120)
+        # The count is the last line: the manager says on its own line why nothing answers yet.
+        ready = out.splitlines()[-1] == "1" if out else False
+        if ready or time.time() > deadline:
             break
         time.sleep(10)
-    fact("core-ready", "yes" if out == "1" else "no")
+    fact("core-ready", "yes" if ready else "no")
     out, status = run(console, as_account("yoke instance show station") + " | grep -E '^(id|desired_state):' | tr -d ' ' | tr '\\n' ' '")
     fact("instance", out.replace(" ", "/") or "unknown")
     for unit in ("acquire", "panel"):
         out, status = run(console, as_account(f"yoke core read unit {unit} --instance station")
-                          + " | grep -m1 -oE '\"state\": \"[A-Za-z]+\"' | cut -d'\"' -f4")
+                          + " | grep -m1 -oE '\"state\": *\"[A-Za-z]+\"' | cut -d'\"' -f4")
         fact(f"unit-{unit}", out or "unknown")
 
     # The panel draws once it is running; the display is read after it has had time to.
@@ -107,6 +119,12 @@ try:
 except pexpect.exceptions.ExceptionPexpect as e:
     fact("stopped", type(e).__name__)
 finally:
+    # What the account's services said, kept in the boot's log for whoever reads a failure.
+    try:
+        run(console, f"journalctl -b --no-pager _UID=$(id -u {account}) | tail -150", timeout=120)
+        run(console, as_account(f"yoke instance show {account}"), timeout=120)
+    except pexpect.exceptions.ExceptionPexpect:
+        pass
     console.sendline("poweroff")
     try:
         console.expect(pexpect.EOF, timeout=300)

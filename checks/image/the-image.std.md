@@ -29,7 +29,7 @@
 | **Label** | blocking |
 | **Precondition** | the build of `the-layer.05`, for `qemux86-64` and `qemuarm64` |
 | **Action** | read the image's manifest; unpack the example's package |
-| **Expected** | the image holds `yoke`, `yoke-core`, `yoke-guardian`, `yoke-packaging`, `yoke-reference-instrument`, the example's package and LVGL, and neither `yoke-compose`, `yoke-conformance` nor any family's harness; the example's package holds one application package, `com.yoke.station.device`, built for the machine's architecture: its `acquire` and `panel` are programs for that architecture |
+| **Expected** | the image holds `yoke`, `yoke-core`, `yoke-guardian`, `yoke-packaging`, `yoke-reference-instrument`, the example's package and LVGL, and neither `yoke-compose`, `yoke-conformance` nor any family's harness; the example's package holds one application package, `com.yoke.station.device`, built for the machine's architecture: its `acquire` and `panel` are programs for that architecture, and the example's package depends on every library the panel's own package does |
 
 ## meta-yoke:the-image.03 — the image boots into a host whose guardian brings the instance up
 
