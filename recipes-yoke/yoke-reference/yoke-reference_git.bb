@@ -68,14 +68,15 @@ do_install() {
 }
 
 # One package per program, each with the Manifest its Plugin declares; and the example's package, which
-# carries its own copies of acquire and the panel, and needs the LVGL the panel links.
+# carries its own copies of acquire and the panel inside an archive the build does not look into: it needs
+# the libraries the panel links, which the build finds for the panel's own package.
 PACKAGES =+ "${PN}-acquire ${PN}-instrument ${PN}-clock ${PN}-panel ${PN}-station-device"
 FILES:${PN}-acquire = "${libexecdir}/yoke-reference/acquire ${datadir}/yoke-reference/manifests/com.yoke.station.acquire.yaml"
 FILES:${PN}-instrument = "${libexecdir}/yoke-reference/instrument"
 FILES:${PN}-clock = "${libexecdir}/yoke-reference/clock ${datadir}/yoke-reference/manifests/com.yoke.reference.clock.yaml"
 FILES:${PN}-panel = "${libexecdir}/yoke-reference/panel"
 FILES:${PN}-station-device = "${datadir}/yoke-reference/packages"
-RDEPENDS:${PN}-station-device = "lvgl"
+RDEPENDS:${PN}-station-device = "lvgl grpc protobuf-c libssl libcrypto"
 ALLOW_EMPTY:${PN} = "1"
 
 # Go links its own programs: a static binary carries no GNU hash, and its build identifier is emptied.
