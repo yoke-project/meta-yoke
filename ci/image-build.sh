@@ -37,6 +37,8 @@ CONF
 MACHINE = "$machine"
 DISTRO = "nodistro"
 INIT_MANAGER = "systemd"
+# The example's host needs PAM, which nodistro leaves out.
+DISTRO_FEATURES:append = " pam"
 DL_DIR = "$cache/downloads"
 SSTATE_DIR = "$cache/sstate"
 BB_NUMBER_THREADS ?= "\${@oe.utils.cpu_count()}"
@@ -121,7 +123,9 @@ files_of() { (cd "$1/root" && find . \( -type f -o -type l \) | sed 's#^\.##'); 
 
 # std: meta-yoke:the-yoke-recipe.02
 check_yokes_recipe_builds_its_packages() {
-  local why="" machine package rest expect held dir arch
+  local why="" machine package rest expect held dir arch version
+  # The version the recipe builds, which each program states as the release's programs do.
+  version="$(basename "$(compgen -G "$layer/recipes-yoke/yoke/yoke_*.bb" | head -1)" .bb)"; version="${version#yoke_}"
   for machine in "${machines[@]}"; do
     [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
     case "$machine" in qemux86-64) arch="x86-64" ;; qemuarm64) arch="aarch64" ;; *) arch="" ;; esac
@@ -140,6 +144,10 @@ check_yokes_recipe_builds_its_packages() {
       elif [[ "$package" != yoke-packaging ]]; then
         file "$dir/root$rest" | grep -q "$arch" && file "$dir/root$rest" | grep -q "statically linked" \
           || why+=" $machine's $package is not a static program for $arch;"
+      fi
+      if [[ "$package" != yoke-packaging ]]; then
+        grep -aq "$(printf 'mod\tgithub.com/yoke-project/yoke\tv%s' "$version")" "$dir/root$rest" \
+          || why+=" $machine's $package does not state v$version;"
       fi
       rm -rf "$dir"
     done

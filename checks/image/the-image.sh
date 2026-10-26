@@ -17,6 +17,8 @@ check_the_image_says_what_a_host_of_the_example_holds() {
   for each in yoke yoke-core yoke-guardian yoke-packaging yoke-reference-instrument yoke-reference-station-device; do
     grep -E '^RDEPENDS:\$\{PN\}' "$host" | grep -qw -- "$each" || { echo "the example's host does not depend on $each"; return 1; }
   done
+  grep -qE '^REQUIRED_DISTRO_FEATURES = "systemd pam"$' "$host" \
+    || { echo "the example's host does not require the distro features systemd and pam"; return 1; }
   # The guardian's unit is yoke's to write: the layer enables it and states it nowhere.
   unit="$(grep -rlE '^ExecStart=.*yoke-guardian' "$root"/recipes-* 2> /dev/null)"
   [[ -z "$unit" ]] || { echo "the layer writes a unit of the guardian's: $unit"; return 1; }

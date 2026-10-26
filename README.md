@@ -17,7 +17,7 @@ each repository builds itself with its own verbs, and this layer only describes 
 | `recipes-yoke/yoke-sdk-*/`, `recipes-yoke/python3-yoke-*/` | The five families: the C, C++ and Rust libraries for building against, the Python libraries for a device, the Go family's harnesses for a workstation |
 | `recipes-yoke/yoke-reference/` | The example's units that run on the host, the Go clock, and `com.yoke.station.device`, the example as a device runs it alone, composed in the build |
 | `recipes-graphics/lvgl/` | What the LVGL panel needs of the layers' LVGL: its framebuffer driver, and its library linked as it builds it |
-| `recipes-yoke/yoke-example-host/`, `recipes-yoke/images/` | The image this layer is tested with: a host of the example, whose first boot installs it and whose account's guardian brings it up. A test of the layer, not a product |
+| `recipes-yoke/yoke-example-host/`, `recipes-yoke/images/` | The image this layer is tested with: a host of the example, whose first boot installs it and whose account's guardian brings it up. It needs the distro features `systemd` and `pam`. A test of the layer, not a product |
 | `checks/`, `ci/` | This repository's own checks, and the scripts continuous integration runs; `ci/image.sh` builds an image with the layer, in a build host it defines and at the revisions `ci/layers.lock` pins, and boots it under QEMU |
 
 ## Working on it

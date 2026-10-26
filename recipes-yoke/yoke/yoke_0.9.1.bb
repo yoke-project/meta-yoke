@@ -38,8 +38,17 @@ do_configure() {
 
 do_compile() {
 	cd ${S}
+	# The release builds its programs in a checkout at its tag, and Go stamps the tag into each as the version
+	# the manager reads a range against. The archives are that tree, so a repository of it, tagged, gives the
+	# programs the version the release's own state.
+	rm -rf .git
+	git init -q
+	git add -A
+	GIT_AUTHOR_DATE="@${SOURCE_DATE_EPOCH}" GIT_COMMITTER_DATE="@${SOURCE_DATE_EPOCH}" \
+		git -c user.name=yoke -c user.email=yoke@localhost -c commit.gpgsign=false commit -q -m "v${PV}"
+	git -c tag.gpgsign=false tag "v${PV}"
 	for program in ${RUNTIME_PROGRAMS} ${TOOLING_PROGRAMS}; do
-		${GO} build -trimpath -buildvcs=false -ldflags="-buildid=" -o ${B}/bin/$program ./cmd/$program
+		${GO} build -trimpath -buildvcs=true -ldflags="-buildid=" -o ${B}/bin/$program ./cmd/$program
 	done
 }
 
