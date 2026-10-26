@@ -390,8 +390,8 @@ check_the_image_boots_into_a_host_whose_guardian_brings_the_instance_up() {
   [[ -z "$why" ]] || { echo "${why# }"; return 1; }
 }
 
-# colours <ppm>: how many colours a binary PPM, as QEMU's screendump writes it, holds.
-colours() {
+# light <ppm>: the share, in percent, of light pixels in a binary PPM as QEMU's screendump writes it.
+light() {
   python3 -c '
 import sys
 data = open(sys.argv[1], "rb").read()
@@ -402,7 +402,8 @@ while len(fields) < 4:
     while not data[j:j + 1].isspace(): j += 1
     fields.append(data[i:j]); i = j
 pixels = data[i + 1:]
-print(len({pixels[k:k + 3] for k in range(0, len(pixels), 3)}))' "$1"
+n = len(pixels) // 3
+print(100 * sum(1 for k in range(0, n * 3, 3) if min(pixels[k:k + 3]) >= 200) // max(n, 1))' "$1"
 }
 
 # std: meta-yoke:the-image.04
@@ -412,8 +413,9 @@ check_the_panel_draws_to_the_emulated_framebuffer() {
     [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
     dump="$cache/build-$machine/screendump-$machine.ppm"
     [[ -s "$dump" ]] || { why+=" $machine's display was not read: $(fact "$machine" screendump);"; continue; }
-    n="$(colours "$dump")"
-    (( ${n:-0} > 1 )) || why+=" $machine's display is of one colour;"
+    # The panel's theme is light: most of what it draws is, and neither a console nor QEMU's own message is.
+    n="$(light "$dump")"
+    (( ${n:-0} > 50 )) || why+=" $machine's display is ${n:-?}% light, not what the panel draws;"
   done
   [[ -z "$why" ]] || { echo "${why# }"; return 1; }
 }
