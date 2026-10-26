@@ -2,8 +2,8 @@
 
 | | |
 | --- | --- |
-| **Feature** | `yoke`'s recipe builds a release from its source archive and the archive of its module dependencies, each pinned by the digest the release manifest carries, with the network off and no C, into one package per artifact: the runtime (the Core, the manager, the guardian, the authentication program), the tooling (the composer, the conformance suite) and the packaging inputs; the verification tool in none |
-| **Planning item** | yoke-project/meta-yoke#18 |
+| **Feature** | `yoke`'s recipe builds a release from its source archive and the archive of its module dependencies, each pinned by the digest the release manifest carries, with the network off and no C, into one package per artifact: the runtime (the Core, the manager, the guardian, the authentication program), the tooling (the composer, the conformance suite) and the packaging inputs — among them the guardian's init unit; and the composer for the build host, which composes an application in a build; the verification tool in none |
+| **Planning item** | yoke-project/meta-yoke#18 · yoke-project/meta-yoke#24 |
 
 ## meta-yoke:the-yoke-recipe.01 — the recipe pins what the release published, and fetches nothing else
 
@@ -29,4 +29,4 @@
 | **Label** | blocking |
 | **Precondition** | the build of `the-layer.04`, for `qemux86-64` and `qemuarm64` |
 | **Action** | fetch `yoke`; build it with the network off; list what each of its packages holds |
-| **Expected** | `yoke-core`, `yoke`, `yoke-guardian` and `yoke-auth` each hold the one program they are named after, and `yoke-compose` and `yoke-conformance` theirs; `yoke-packaging` holds the systemd unit and the preset the systemd class writes for it, the tmpfiles and sysusers files and `/etc/yoke/core.yaml`; each program is built for the machine's architecture and statically linked — `yoke-auth`, which opens `libpam` when it runs, dynamically — and no package holds `yoke-verify` |
+| **Expected** | `yoke-core`, `yoke`, `yoke-guardian` and `yoke-auth` each hold the one program they are named after, and `yoke-compose` and `yoke-conformance` theirs; `yoke-packaging` holds the systemd unit and the preset the systemd class writes for it, the guardian's user unit, the tmpfiles and sysusers files and `/etc/yoke/core.yaml`; each program is built for the machine's architecture and statically linked — `yoke-auth`, which opens `libpam` when it runs, dynamically — and no package holds `yoke-verify` |
