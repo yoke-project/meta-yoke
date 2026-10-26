@@ -59,8 +59,9 @@ env = dict(os.environ)
 # runqemu draws nothing: QEMU's display is kept for the screendump the monitor takes, and shown nowhere.
 qemuparams = f"-display none -monitor unix:{monitor},server,nowait"
 kvm = "kvm" if machine == "qemux86-64" and os.access("/dev/kvm", os.W_OK) else ""
-# The kernel's console stays off the framebuffer, so what the display shows is what the panel drew.
-bootparams = "fbcon=map:9"
+# The framebuffer's console sets the display's mode, which the panel's driver does not; the kernel writes to
+# the serial consoles alone, and the console's cursor is off, so on the display the panel draws over a prompt.
+bootparams = "vt.global_cursor_default=0"
 # In snapshot the boot writes nothing back: the image a later run boots is the one the build deployed.
 command = (f"runqemu {machine} {image} ext4 slirp serialstdio snapshot {kvm} "
            f"qemuparams=\"{qemuparams}\" bootparams=\"{bootparams}\"")

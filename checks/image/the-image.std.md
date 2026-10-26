@@ -55,4 +55,4 @@
 | **Label** | blocking |
 | **Precondition** | the boot of `.03`, for each machine, with the instance's units running |
 | **Action** | take a screendump of QEMU's display |
-| **Expected** | the screendump is not of one colour: something has drawn to the framebuffer the panel binds |
+| **Expected** | most of the screendump is light, as the panel's theme draws and neither a console nor QEMU's own message is: the panel has drawn to the framebuffer it binds |
