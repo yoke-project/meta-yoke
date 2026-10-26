@@ -1,0 +1,20 @@
+# The first boot of a host of the example: the package installed and the instance created, as the account
+# that hosts it, before the account's user manager starts the guardian. Once done, never again.
+[Unit]
+Description=Install Yoke's example and create its instance
+After=systemd-tmpfiles-setup.service systemd-sysusers.service
+Before=user@1200.service
+ConditionPathExists=!/var/lib/yoke-example/installed
+
+[Service]
+Type=oneshot
+User=station
+# The manager reads the account's directories as the user manager will give them.
+Environment=HOME=/home/station XDG_RUNTIME_DIR=/run/user/1200
+StateDirectory=yoke-example
+ExecStart=/usr/libexec/yoke-example/first-boot
+ExecStartPost=/bin/touch /var/lib/yoke-example/installed
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
