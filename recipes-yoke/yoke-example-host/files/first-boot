@@ -1,0 +1,11 @@
+#!/bin/sh
+# The first boot of a host of the example, as the account that hosts it, before the account's user manager
+# runs: the example's package installed, its instance created with its desired state running and enabled.
+# Nothing is told and no guardian started here; the guardian's unit, started by the user manager next,
+# brings the instance up in its boot pass.
+set -eu
+
+package="$(ls /usr/share/yoke-reference/packages/com.yoke.station.device-*.yoke)"
+yoke app install "$package"
+yoke instance create com.yoke.station.device --name station --params /usr/share/yoke-example/station.toml --running
+yoke instance enable station

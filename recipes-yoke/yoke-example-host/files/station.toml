@@ -1,0 +1,7 @@
+# The values the example's instance is created with on a host of this layer's image.
+[shared]
+site_label = "meta-yoke"
+
+[acquire]
+# The stable name yoke-example-instrument.service links the spectrometer's pseudo-terminal at.
+instrument = "/run/yoke-example/instrument"

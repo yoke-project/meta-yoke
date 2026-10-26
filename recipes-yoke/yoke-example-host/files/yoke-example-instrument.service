@@ -1,0 +1,16 @@
+# The spectrometer acquire drives, played by instrument on a pseudo-terminal linked at a stable name: a
+# device the host has before Yoke runs, as a udev rule would name a real one. It belongs to the account that
+# hosts the example, which opens it.
+[Unit]
+Description=The example's spectrometer, played by instrument
+Before=user@1200.service
+
+[Service]
+Type=exec
+User=station
+RuntimeDirectory=yoke-example
+ExecStart=/usr/libexec/yoke-reference/instrument --link /run/yoke-example/instrument
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
