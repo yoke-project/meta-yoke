@@ -6,7 +6,8 @@ LICENSE = "MIT"
 
 require recipes-core/images/core-image-minimal.bb
 
-IMAGE_INSTALL:append = " yoke-example-host util-linux-su"
+# The test reads the host as the account with su, which shadow-base carries.
+IMAGE_INSTALL:append = " yoke-example-host shadow-base"
 IMAGE_FEATURES += "allow-empty-password empty-root-password allow-root-login"
 
 # The first boot installs the example into the install root; the image leaves it the room.
