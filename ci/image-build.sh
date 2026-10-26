@@ -326,7 +326,8 @@ check_the_image_holds_a_host_of_the_example() {
     if [[ -z "$package" || "$held" != "$package" ]]; then
       why+=" $machine's yoke-reference-station-device holds [$(tr '\n' ' ' <<<"$held")], want one com.yoke.station.device package;"
     else
-      mkdir -p "$dir/package" && tar -xf "$dir/root$package" -C "$dir/package" 2> /dev/null \
+      # An application package is a zip archive.
+      python3 -m zipfile -e "$dir/root$package" "$dir/package" 2> /dev/null \
         || why+=" $machine's com.yoke.station.device package does not unpack;"
       for program in plugins/acquire interfaces/panel; do
         file -L "$(find "$dir/package" -path "*/components/$program" | head -1)" 2> /dev/null | grep -q "$arch" \
