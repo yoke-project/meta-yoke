@@ -10,8 +10,8 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327 \
 # The two archives the release publishes, each pinned by the digest its manifest line carries.
 SRC_URI = "https://github.com/yoke-project/yoke/releases/download/v${PV}/yoke-${PV}-source.tar.gz;name=source \
            https://github.com/yoke-project/yoke/releases/download/v${PV}/yoke-${PV}-modules.tar.gz;name=modules"
-SRC_URI[source.sha256sum] = "d869121d9c9becfd68c632a43de494dc7a900b66cc2da88351e578f71edddc47"
-SRC_URI[modules.sha256sum] = "e00f3cddf5571926cf238803eea6be6eb3a8f0780ca2ec13d4d4a9387dc7c96c"
+SRC_URI[source.sha256sum] = "4c797408894c67c824b7dc66e1439b864cb0a16017f185537c103f43b12410c1"
+SRC_URI[modules.sha256sum] = "cd51422e02f598c5ad61d36297af871b8dc871a7926f11efe0c557fe1f539a6d"
 
 # Both archives unpack into yoke-<version>/: the modules archive is the vendor/ directory of that tree.
 S = "${UNPACKDIR}/yoke-${PV}"
@@ -26,6 +26,11 @@ export GOPROXY = "off"
 
 RUNTIME_PROGRAMS = "yoke-core yoke yoke-guardian yoke-auth"
 TOOLING_PROGRAMS = "yoke-compose yoke-conformance"
+
+# Built for the build host, the recipe is the composer alone: what a build composes an application with.
+BBCLASSEXTEND = "native"
+RUNTIME_PROGRAMS:class-native = ""
+TOOLING_PROGRAMS:class-native = "yoke-compose"
 
 do_configure() {
 	:
@@ -45,9 +50,14 @@ do_install() {
 	done
 	# The packaging inputs `yoke` ships, installed where the init system and the Core read them.
 	install -D -m 0644 ${S}/packaging/yoke.service ${D}${systemd_system_unitdir}/yoke.service
+	install -D -m 0644 ${S}/packaging/yoke-guardian.service ${D}${systemd_user_unitdir}/yoke-guardian.service
 	install -D -m 0644 ${S}/packaging/yoke.tmpfiles ${D}${nonarch_libdir}/tmpfiles.d/yoke.conf
 	install -D -m 0644 ${S}/packaging/yoke.sysusers ${D}${nonarch_libdir}/sysusers.d/yoke.conf
 	install -D -m 0644 ${S}/packaging/core.yaml ${D}${sysconfdir}/yoke/core.yaml
+}
+
+do_install:class-native() {
+	install -D -m 0755 ${B}/bin/yoke-compose ${D}${bindir}/yoke-compose
 }
 
 # One package per artifact: the runtime, the tooling, and the inputs a device's init system is given.
@@ -58,7 +68,8 @@ FILES:yoke-guardian = "${bindir}/yoke-guardian"
 FILES:yoke-auth = "${bindir}/yoke-auth"
 FILES:yoke-compose = "${bindir}/yoke-compose"
 FILES:yoke-conformance = "${bindir}/yoke-conformance"
-FILES:yoke-packaging = "${systemd_system_unitdir}/yoke.service ${nonarch_libdir}/tmpfiles.d/yoke.conf \
+FILES:yoke-packaging = "${systemd_system_unitdir}/yoke.service ${systemd_user_unitdir}/yoke-guardian.service \
+                        ${nonarch_libdir}/tmpfiles.d/yoke.conf \
                         ${nonarch_libdir}/sysusers.d/yoke.conf ${sysconfdir}/yoke/core.yaml"
 CONFFILES:yoke-packaging = "${sysconfdir}/yoke/core.yaml"
 
@@ -70,7 +81,8 @@ RDEPENDS:yoke-packaging = "${PN}"
 
 SYSTEMD_PACKAGES = "yoke-packaging"
 SYSTEMD_SERVICE:yoke-packaging = "yoke.service"
-# The unit starts the deployment installed on the host; an image without one would start a refusal.
+# The unit starts the deployment installed on the host; an image without one would start a refusal. The
+# guardian's unit is a user unit, enabled for an account by whoever gives the host one.
 SYSTEMD_AUTO_ENABLE = "disable"
 
 # Go links its own programs: a static binary carries no GNU hash, and its build identifier is emptied.
