@@ -12,7 +12,10 @@ SRC_URI = "file://first-boot \
            file://yoke-example-instrument.service"
 S = "${UNPACKDIR}"
 
-inherit useradd systemd allarch
+inherit useradd systemd allarch features_check
+
+# The account's user manager runs under PAM, which systemd builds in only with the distro feature.
+REQUIRED_DISTRO_FEATURES = "systemd pam"
 
 # The account, at a fixed identifier: the first boot is ordered before its user manager, user@1200.service.
 # It may install applications (yoke-apps, the group yoke's sysusers file names) and draw to the framebuffer

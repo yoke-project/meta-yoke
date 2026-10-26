@@ -16,7 +16,7 @@
 | **Label** | blocking |
 | **Precondition** | a clean checkout |
 | **Action** | read the image's recipe, the recipe of the example's host, and `ci/image-build.sh` |
-| **Expected** | the image installs the example's host and no tooling package — neither `yoke-compose` nor `yoke-conformance`; the example's host depends on the runtime packages, the packaging inputs, the example's package and `instrument`; the layer writes no unit of the guardian's, and enables the one `yoke` ships for the account; the first-boot unit, ordered before the account's user manager, installs the package with `yoke app install`, creates the instance running with `yoke instance create --running` and enables it with `yoke instance enable`, and starts nothing itself — the guardian's unit brings it up; the image is what `ci/image-build.sh` builds |
+| **Expected** | the image installs the example's host and no tooling package — neither `yoke-compose` nor `yoke-conformance`; the example's host requires the distro features `systemd` and `pam`, under which the account's user manager runs, and depends on the runtime packages, the packaging inputs, the example's package and `instrument`; the layer writes no unit of the guardian's, and enables the one `yoke` ships for the account; the first-boot unit, ordered before the account's user manager, installs the package with `yoke app install`, creates the instance running with `yoke instance create --running` and enables it with `yoke instance enable`, and starts nothing itself — the guardian's unit brings it up; the image is what `ci/image-build.sh` builds |
 
 ## meta-yoke:the-image.02 — the image holds a host of the example, and no tooling
 

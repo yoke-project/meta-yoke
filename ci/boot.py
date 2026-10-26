@@ -27,7 +27,8 @@ def fact(name, value):
 def run(console, command, timeout=60):
     """What a command printed on the console and its exit status, the prompt being one of the script's own."""
     console.sendline(f"{command}; echo \"status=$?\"")
-    console.expect(r"status=(\d+)\r?\n", timeout=timeout)
+    # The serial console ends a line with more than one carriage return.
+    console.expect(r"status=(\d+)\r*\n", timeout=timeout)
     out = console.before.decode(errors="replace")
     status = int(console.match.group(1))
     console.expect_exact(prompt, timeout=timeout)
@@ -56,7 +57,8 @@ qemuparams = f"-display none -monitor unix:{monitor},server,nowait"
 kvm = "kvm" if machine == "qemux86-64" and os.access("/dev/kvm", os.W_OK) else ""
 # The kernel's console stays off the framebuffer, so what the display shows is what the panel drew.
 bootparams = "fbcon=map:9"
-command = (f"runqemu {machine} {image} ext4 slirp serialstdio {kvm} "
+# In snapshot the boot writes nothing back: the image a later run boots is the one the build deployed.
+command = (f"runqemu {machine} {image} ext4 slirp serialstdio snapshot {kvm} "
            f"qemuparams=\"{qemuparams}\" bootparams=\"{bootparams}\"")
 fact("command", command.replace(" ", "_"))
 console = pexpect.spawn("bash", ["-c", command], cwd=build, env=env, timeout=60)
