@@ -50,7 +50,7 @@ CONF
 bitbake_in() {
   local build="$1"; shift
   # shellcheck disable=SC1091
-  (cd "$build" && export BBPATH="$build" PATH="$cache/layers/bitbake/bin:$PATH" PYTHONPATH="$cache/layers/bitbake/lib" \
+  (cd "$build" && export BBPATH="$build" PATH="$cache/layers/bitbake/bin:$cache/layers/openembedded-core/scripts:$PATH" PYTHONPATH="$cache/layers/bitbake/lib" \
      BB_ENV_PASSTHROUGH_ADDITIONS="BB_NO_NETWORK" && "$@")
 }
 
@@ -70,7 +70,7 @@ check_the_layer_is_taken_into_a_build() {
 
 # What a machine's build is asked for: the image, and every recipe of this layer, fetched once and then
 # built with the network off. Each machine's outcome is kept for the cases below to read.
-target="${YOKE_IMAGE:-core-image-minimal}"
+target="${YOKE_IMAGE:-yoke-example-image}"
 recipes="$(find "$layer"/recipes-* -name '*.bb' 2> /dev/null | sed -E 's#.*/([^/_]+)(_[^/]*)?\.bb$#\1#' | sort -u | tr '\n' ' ')"
 declare -A built=()
 for machine in "${machines[@]}"; do
@@ -81,7 +81,7 @@ for machine in "${machines[@]}"; do
   # what it already has, so one interrupted by the link is performed again, a few times, before it fails.
   tries="${YOKE_FETCH_TRIES:-3}" fetched=""
   for (( try = 1; try <= tries; try++ )); do
-    if bitbake_in "$build" env BB_NUMBER_THREADS="${YOKE_FETCH_THREADS:-2}" bitbake --runall=fetch "$target" $recipes > "$log" 2>&1; then
+    if bitbake_in "$build" env BB_NUMBER_THREADS="${YOKE_FETCH_THREADS:-2}" bitbake --runall=fetch "$target" $recipes qemu-system-native > "$log" 2>&1; then
       fetched=1; break
     fi
   done
@@ -90,7 +90,7 @@ for machine in "${machines[@]}"; do
     continue
   fi
   log="$cache/logs/$machine-build.log"
-  if ! bitbake_in "$build" env BB_NO_NETWORK=1 bitbake "$target" $recipes > "$log" 2>&1; then
+  if ! bitbake_in "$build" env BB_NO_NETWORK=1 bitbake "$target" $recipes qemu-system-native > "$log" 2>&1; then
     built[$machine]="does not build offline: $(grep -m3 ERROR "$log")"
     continue
   fi
@@ -127,7 +127,7 @@ check_yokes_recipe_builds_its_packages() {
     case "$machine" in qemux86-64) arch="x86-64" ;; qemuarm64) arch="aarch64" ;; *) arch="" ;; esac
     for expect in "yoke-core /usr/bin/yoke-core" "yoke /usr/bin/yoke" "yoke-guardian /usr/bin/yoke-guardian" \
                   "yoke-auth /usr/bin/yoke-auth" "yoke-compose /usr/bin/yoke-compose" "yoke-conformance /usr/bin/yoke-conformance" \
-                  "yoke-packaging /usr/lib/systemd/system/yoke.service /usr/lib/systemd/system-preset/98-yoke-packaging.preset /usr/lib/tmpfiles.d/yoke.conf /usr/lib/sysusers.d/yoke.conf /etc/yoke/core.yaml"; do
+                  "yoke-packaging /usr/lib/systemd/system/yoke.service /usr/lib/systemd/system-preset/98-yoke-packaging.preset /usr/lib/systemd/user/yoke-guardian.service /usr/lib/tmpfiles.d/yoke.conf /usr/lib/sysusers.d/yoke.conf /etc/yoke/core.yaml"; do
       read -r package rest <<<"$expect"
       dir="$(mktemp -d)"
       if ! unpack "$machine" "$package" "$dir"; then why+=" $machine built no package $package;"; rm -rf "$dir"; continue; fi
@@ -306,6 +306,100 @@ check_the_reference_recipe_builds_the_host_units() {
   [[ -z "$why" ]] || { echo "${why# }"; return 1; }
 }
 
+# std: meta-yoke:the-image.02
+check_the_image_holds_a_host_of_the_example() {
+  local why="" machine manifest package dir arch held program
+  for machine in "${machines[@]}"; do
+    [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
+    case "$machine" in qemux86-64) arch="x86-64" ;; qemuarm64) arch="aarch64" ;; *) arch="" ;; esac
+    manifest="$cache/build-$machine/tmp/deploy/images/$machine/$target-$machine.rootfs.manifest"
+    [[ -f "$manifest" ]] || { why+=" $machine's image has no manifest;"; continue; }
+    for package in yoke yoke-core yoke-guardian yoke-packaging yoke-reference-instrument yoke-reference-station-device lvgl; do
+      grep -qE "^$package " "$manifest" || why+=" $machine's image does not hold $package;"
+    done
+    held="$(grep -E '^(yoke-compose|yoke-conformance|yoke-sdk-[a-z]+) ' "$manifest" | awk '{print $1}' | tr '\n' ' ')"
+    [[ -z "$held" ]] || why+=" $machine's image holds ${held% };"
+    dir="$(mktemp -d)"
+    if ! unpack "$machine" yoke-reference-station-device "$dir"; then why+=" $machine built no package yoke-reference-station-device;"; rm -rf "$dir"; continue; fi
+    held="$(files_of "$dir")"
+    package="$(grep -E '^/usr/share/yoke-reference/packages/com\.yoke\.station\.device-[^/]+\.yoke$' <<<"$held")"
+    if [[ -z "$package" || "$held" != "$package" ]]; then
+      why+=" $machine's yoke-reference-station-device holds [$(tr '\n' ' ' <<<"$held")], want one com.yoke.station.device package;"
+    else
+      mkdir -p "$dir/package" && tar -xf "$dir/root$package" -C "$dir/package" 2> /dev/null \
+        || why+=" $machine's com.yoke.station.device package does not unpack;"
+      for program in plugins/acquire interfaces/panel; do
+        file -L "$(find "$dir/package" -path "*/components/$program" | head -1)" 2> /dev/null | grep -q "$arch" \
+          || why+=" $machine's application package holds no $program for $arch;"
+      done
+    fi
+    rm -rf "$dir"
+  done
+  [[ -z "$why" ]] || { echo "${why# }"; return 1; }
+}
+
+# Each machine whose image built is booted once, by ci/boot.py; the facts it read on the console are kept
+# for the cases below.
+declare -A booted=()
+for machine in "${machines[@]}"; do
+  [[ "${built[$machine]}" == ok ]] || continue
+  build="$cache/build-$machine"
+  rm -f "$build/screendump-$machine.ppm"
+  bitbake_in "$build" python3 "$layer/ci/boot.py" "$build" "$machine" "$target" "$build/screendump-$machine.ppm" \
+    > "$cache/logs/$machine-boot.facts" 2> "$cache/logs/$machine-boot.err"
+  booted[$machine]="$cache/logs/$machine-boot.facts"
+done
+
+# fact <machine> <name>: what the boot of a machine read, or nothing.
+fact() { awk -v n="$2" '$1 == n {sub(/^[^ ]+ /, ""); print; exit}' "${booted[$1]:-/dev/null}"; }
+
+# std: meta-yoke:the-image.03
+check_the_image_boots_into_a_host_whose_guardian_brings_the_instance_up() {
+  local why="" machine name want got
+  for machine in "${machines[@]}"; do
+    [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
+    if [[ "$(fact "$machine" login)" != yes ]]; then
+      why+=" $machine did not boot to a login ($(fact "$machine" stopped)$(tail -2 "$cache/logs/$machine-boot.err" | tr '\n' ' ')): $(tail -c 300 "$cache/build-$machine/boot-$machine.log" 2> /dev/null | tr -d '\r' | tr '\n' ' ');"
+      continue
+    fi
+    for want in "first-boot success" "account yes/active" "signed-in 0" "guardian active" "core-ready yes" \
+                "instance id:com.yoke.station.device/desired_state:running" "unit-acquire Running" "unit-panel Running"; do
+      read -r name want <<<"$want"
+      got="$(fact "$machine" "$name")"
+      [[ "$got" == "$want" ]] || why+=" $machine's $name is '${got:-unread}', want '$want';"
+    done
+  done
+  [[ -z "$why" ]] || { echo "${why# }"; return 1; }
+}
+
+# colours <ppm>: how many colours a binary PPM, as QEMU's screendump writes it, holds.
+colours() {
+  python3 -c '
+import sys
+data = open(sys.argv[1], "rb").read()
+fields, i = [], 0
+while len(fields) < 4:
+    while data[i:i + 1].isspace(): i += 1
+    j = i
+    while not data[j:j + 1].isspace(): j += 1
+    fields.append(data[i:j]); i = j
+pixels = data[i + 1:]
+print(len({pixels[k:k + 3] for k in range(0, len(pixels), 3)}))' "$1"
+}
+
+# std: meta-yoke:the-image.04
+check_the_panel_draws_to_the_emulated_framebuffer() {
+  local why="" machine dump n
+  for machine in "${machines[@]}"; do
+    [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
+    dump="$cache/build-$machine/screendump-$machine.ppm"
+    [[ -s "$dump" ]] || { why+=" $machine's display was not read: $(fact "$machine" screendump);"; continue; }
+    n="$(colours "$dump")"
+    (( ${n:-0} > 1 )) || why+=" $machine's display is of one colour;"
+  done
+  [[ -z "$why" ]] || { echo "${why# }"; return 1; }
+}
+
 for each in "meta-yoke:the-layer.04 check_the_layer_is_taken_into_a_build" \
             "meta-yoke:the-layer.05 check_an_image_builds_offline_once_fetched" \
             "meta-yoke:the-yoke-recipe.02 check_yokes_recipe_builds_its_packages" \
@@ -314,7 +408,10 @@ for each in "meta-yoke:the-layer.04 check_the_layer_is_taken_into_a_build" \
             "meta-yoke:the-rust-recipe.02 check_the_rust_recipe_builds_the_library" \
             "meta-yoke:the-python-recipes.02 check_the_python_recipes_build_the_libraries" \
             "meta-yoke:the-go-recipe.02 check_the_go_recipe_builds_the_harnesses" \
-            "meta-yoke:the-reference-recipe.02 check_the_reference_recipe_builds_the_host_units"; do
+            "meta-yoke:the-reference-recipe.02 check_the_reference_recipe_builds_the_host_units" \
+            "meta-yoke:the-image.02 check_the_image_holds_a_host_of_the_example" \
+            "meta-yoke:the-image.03 check_the_image_boots_into_a_host_whose_guardian_brings_the_instance_up" \
+            "meta-yoke:the-image.04 check_the_panel_draws_to_the_emulated_framebuffer"; do
   read -r id fn <<<"$each"
   if out="$("$fn" 2>&1)"; then say "$id" ""; else say "$id" "$out"; fi
 done
