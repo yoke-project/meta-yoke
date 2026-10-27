@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Feature** | an image of the runtime packages, the packaging inputs and the example, built with this layer and booted under QEMU on `qemux86-64` and `qemuarm64`: the example as a device runs it alone is composed in the build, by the composer built for the build host, and installed at the first boot as an application of an account the image holds; the account's user manager runs at boot, and starts the guardian with the unit `yoke` ships; the guardian brings the instance up, its `acquire` bound to an `instrument` the image runs as a device of its own; the LVGL panel draws to the emulated framebuffer; an operator reads the instance's state; the tooling packages are not in it |
-| **Planning item** | yoke-project/meta-yoke#24 |
+| **Planning item** | yoke-project/meta-yoke#24 · yoke-project/meta-yoke#34 |
 
 ## meta-yoke:the-image.01 — the image says what a host of the example holds, and states nothing `yoke` owns
 
@@ -42,7 +42,7 @@
 | **Label** | blocking |
 | **Precondition** | the image of `.02`, for each machine; QEMU built by the same build |
 | **Action** | boot the image under QEMU; on its serial console, wait for the first boot to end; as the account, read the guardian's unit, the instance, and the Core's status through the manager |
-| **Expected** | for each machine the image boots to a login; the first-boot unit ends successfully; the account's `yoke-guardian.service` is active, started by the account's user manager with no one signed in; the instance `station` is pinned to `com.yoke.station.device` and wants to run; its Core answers `yoke core status`, and its units `acquire` and `panel` are running |
+| **Expected** | for each machine the image boots to a login; the first-boot unit ends successfully; the account's `yoke-guardian.service` is active, started by the account's user manager with no one signed in; the instance `station` is pinned to `com.yoke.station.device` and wants to run; its Core answers `yoke core status`, and its units `acquire` and `panel` are running; and `yoke.service`, which the image holds through `yoke-packaging`, stays disabled — nothing in this image asked for a service deployment |
 
 ## meta-yoke:the-image.04 — the LVGL panel draws to the emulated framebuffer
 
