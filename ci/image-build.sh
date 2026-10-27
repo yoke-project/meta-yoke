@@ -288,28 +288,48 @@ check_the_go_recipe_builds_the_harnesses() {
 
 # std: meta-yoke:the-reference-recipe.02
 check_the_reference_recipe_builds_the_host_units() {
-  local why="" machine dir arch package program held lvgl
+  local why="" machine dir arch package program held lvgl plugin path id
   for machine in "${machines[@]}"; do
     [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
     case "$machine" in qemux86-64) arch="x86-64" ;; qemuarm64) arch="aarch64" ;; *) arch="" ;; esac
-    for program in acquire instrument clock panel; do
+    # Where each program goes: a Plugin where the service form resolves it from its identity, the panel where
+    # a composition names it, instrument where the image's own unit runs it.
+    for each in "acquire /usr/lib/yoke/plugins/com.yoke.station.acquire com.yoke.station.acquire" \
+                "clock /usr/lib/yoke/plugins/com.yoke.reference.clock com.yoke.reference.clock" \
+                "panel /usr/lib/yoke/interfaces/station-panel -" \
+                "instrument /usr/libexec/yoke-reference/instrument -"; do
+      read -r program path plugin <<<"$each"
       package="yoke-reference-$program" dir="$(mktemp -d)"
       if ! unpack "$machine" "$package" "$dir"; then why+=" $machine built no package $package;"; rm -rf "$dir"; continue; fi
       held="$(files_of "$dir")"
-      if ! grep -qxF "/usr/libexec/yoke-reference/$program" <<<"$held"; then
-        why+=" $machine's $package holds no /usr/libexec/yoke-reference/$program;"
+      if ! grep -qxF "$path" <<<"$held"; then
+        why+=" $machine's $package holds no $path;"
       else
-        file -L "$dir/root/usr/libexec/yoke-reference/$program" | grep -q "$arch" || why+=" $machine's $program is not built for $arch;"
+        file -L "$dir/root$path" | grep -q "$arch" || why+=" $machine's $program is not built for $arch;"
       fi
-      [[ "$program" == acquire ]] && ! grep -qE '^/usr/share/yoke-reference/manifests/[^/]+\.yaml$' <<<"$held" \
-        && why+=" $machine's $package holds no Manifest;"
-      if [[ "$program" == panel && -f "$dir/root/usr/libexec/yoke-reference/panel" ]]; then
-        readelf -d "$dir/root/usr/libexec/yoke-reference/panel" | grep -q 'NEEDED.*liblvgl\.so' || why+=" $machine's panel does not link LVGL's shared library;"
+      if [[ "$plugin" != - ]]; then
+        if ! grep -qxF "/etc/yoke/plugins.d/$plugin/manifest.yaml" <<<"$held"; then
+          why+=" $machine's $package holds no /etc/yoke/plugins.d/$plugin/manifest.yaml;"
+        else
+          id="$(sed -n 's/^id: *//p' "$dir/root/etc/yoke/plugins.d/$plugin/manifest.yaml" | tr -d '"' | head -1)"
+          [[ "$id" == "$plugin" ]] || why+=" $machine's Manifest in plugins.d/$plugin names $id;"
+        fi
+      fi
+      if [[ "$program" == panel && -f "$dir/root$path" ]]; then
+        readelf -d "$dir/root$path" | grep -q 'NEEDED.*liblvgl\.so' || why+=" $machine's panel does not link LVGL's shared library;"
         lvgl="$(compgen -G "$cache/build-$machine/tmp/deploy/ipk/*/lvgl_*.ipk" | head -1)"
         [[ -n "$lvgl" ]] || why+=" $machine built no package of LVGL;"
       fi
       rm -rf "$dir"
     done
+    dir="$(mktemp -d)"
+    if ! unpack "$machine" yoke-reference-station-service "$dir"; then
+      why+=" $machine built no package yoke-reference-station-service;"
+    else
+      grep -qxF /usr/share/yoke-reference/compositions/station-device.yaml <<<"$(files_of "$dir")" \
+        || why+=" $machine's yoke-reference-station-service holds no composition;"
+    fi
+    rm -rf "$dir"
   done
   [[ -z "$why" ]] || { echo "${why# }"; return 1; }
 }
