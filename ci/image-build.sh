@@ -73,6 +73,8 @@ check_the_layer_is_taken_into_a_build() {
 # What a machine's build is asked for: the image, and every recipe of this layer, fetched once and then
 # built with the network off. Each machine's outcome is kept for the cases below to read.
 target="${YOKE_IMAGE:-yoke-example-image}"
+# The same example in the service form, an image of its own: each form is a promise the layer makes.
+service_target="${YOKE_SERVICE_IMAGE:-yoke-example-service-image}"
 recipes="$(find "$layer"/recipes-* -name '*.bb' 2> /dev/null | sed -E 's#.*/([^/_]+)(_[^/]*)?\.bb$#\1#' | sort -u | tr '\n' ' ')"
 declare -A built=()
 for machine in "${machines[@]}"; do
@@ -386,10 +388,14 @@ for machine in "${machines[@]}"; do
   bitbake_in "$build" python3 "$layer/ci/boot.py" "$build" "$machine" "$target" "$build/screendump-$machine.ppm" \
     > "$cache/logs/$machine-boot.facts" 2> "$cache/logs/$machine-boot.err"
   booted[$machine]="$cache/logs/$machine-boot.facts"
+  rm -f "$build/screendump-service-$machine.ppm"
+  bitbake_in "$build" python3 "$layer/ci/boot.py" "$build" "$machine" "$service_target" "$build/screendump-service-$machine.ppm" service \
+    > "$cache/logs/$machine-service-boot.facts" 2> "$cache/logs/$machine-service-boot.err"
 done
 
-# fact <machine> <name>: what the boot of a machine read, or nothing.
+# fact <machine> <name>: what the boot of a machine read, or nothing; sfact, the same of its service image.
 fact() { awk -v n="$2" '$1 == n {sub(/^[^ ]+ /, ""); print; exit}' "${booted[$1]:-/dev/null}"; }
+sfact() { [[ -n "${booted[$1]:-}" ]] || return 0; awk -v n="$2" '$1 == n {sub(/^[^ ]+ /, ""); print; exit}' "$cache/logs/$1-service-boot.facts"; }
 
 # std: meta-yoke:the-image.03
 check_the_image_boots_into_a_host_whose_guardian_brings_the_instance_up() {
@@ -401,7 +407,8 @@ check_the_image_boots_into_a_host_whose_guardian_brings_the_instance_up() {
       continue
     fi
     for want in "first-boot success" "account yes/lingering" "signed-in 0" "guardian active" "core-ready yes" \
-                "instance id:com.yoke.station.device/desired_state:running" "unit-acquire Running" "unit-panel Running"; do
+                "instance id:com.yoke.station.device/desired_state:running" "unit-acquire Running" "unit-panel Running" \
+                "service-unit disabled"; do
       read -r name want <<<"$want"
       got="$(fact "$machine" "$name")"
       [[ "$got" == "$want" ]] || why+=" $machine's $name is '${got:-unread}', want '$want';"
@@ -440,6 +447,56 @@ check_the_panel_draws_to_the_emulated_framebuffer() {
   [[ -z "$why" ]] || { echo "${why# }"; return 1; }
 }
 
+# std: meta-yoke:the-service-image.02
+check_the_service_image_holds_a_deployment_of_the_example() {
+  local why="" machine manifest package held
+  for machine in "${machines[@]}"; do
+    [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
+    manifest="$cache/build-$machine/tmp/deploy/images/$machine/$service_target-$machine.rootfs.manifest"
+    [[ -f "$manifest" ]] || { why+=" $machine's service image has no manifest;"; continue; }
+    for package in yoke yoke-core yoke-packaging yoke-reference-acquire yoke-reference-panel yoke-reference-instrument \
+                   yoke-reference-station-service lvgl; do
+      grep -qE "^$package " "$manifest" || why+=" $machine's service image does not hold $package;"
+    done
+    held="$(grep -E '^(yoke-compose|yoke-conformance|yoke-guardian|yoke-sdk-[a-z]+) ' "$manifest" | awk '{print $1}' | tr '\n' ' ')"
+    [[ -z "$held" ]] || why+=" $machine's service image holds ${held% };"
+  done
+  [[ -z "$why" ]] || { echo "${why# }"; return 1; }
+}
+
+# std: meta-yoke:the-service-image.03
+check_the_init_system_starts_the_deployment() {
+  local why="" machine name want got
+  for machine in "${machines[@]}"; do
+    [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
+    if [[ "$(sfact "$machine" login)" != yes ]]; then
+      why+=" $machine's service image did not boot to a login ($(sfact "$machine" stopped)$(tail -2 "$cache/logs/$machine-service-boot.err" 2> /dev/null | tr '\n' ' ')): $(tail -c 300 "$cache/build-$machine/boot-$machine-service.log" 2> /dev/null | tr -d '\r' | tr '\n' ' ');"
+      continue
+    fi
+    for want in "service-enabled enabled" "service-active yes" "deployment deployments/station.yaml" "composition same" \
+                "core-ready yes" "unit-acquire Running" "unit-panel Running"; do
+      read -r name want <<<"$want"
+      got="$(sfact "$machine" "$name")"
+      [[ "$got" == "$want" ]] || why+=" $machine's service $name is '${got:-unread}', want '$want';"
+    done
+  done
+  [[ -z "$why" ]] || { echo "${why# }"; return 1; }
+}
+
+# std: meta-yoke:the-service-image.04
+check_the_panel_draws_as_a_service() {
+  local why="" machine dump n
+  for machine in "${machines[@]}"; do
+    [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
+    dump="$cache/build-$machine/screendump-service-$machine.ppm"
+    [[ -s "$dump" ]] || { why+=" $machine's service display was not read: $(sfact "$machine" screendump);"; continue; }
+    # The panel's theme is light: most of what it draws is, and neither a console nor QEMU's own message is.
+    n="$(light "$dump")"
+    (( ${n:-0} > 50 )) || why+=" $machine's service display is ${n:-?}% light, not what the panel draws;"
+  done
+  [[ -z "$why" ]] || { echo "${why# }"; return 1; }
+}
+
 for each in "meta-yoke:the-layer.04 check_the_layer_is_taken_into_a_build" \
             "meta-yoke:the-layer.05 check_an_image_builds_offline_once_fetched" \
             "meta-yoke:the-yoke-recipe.02 check_yokes_recipe_builds_its_packages" \
@@ -451,7 +508,10 @@ for each in "meta-yoke:the-layer.04 check_the_layer_is_taken_into_a_build" \
             "meta-yoke:the-reference-recipe.02 check_the_reference_recipe_builds_the_host_units" \
             "meta-yoke:the-image.02 check_the_image_holds_a_host_of_the_example" \
             "meta-yoke:the-image.03 check_the_image_boots_into_a_host_whose_guardian_brings_the_instance_up" \
-            "meta-yoke:the-image.04 check_the_panel_draws_to_the_emulated_framebuffer"; do
+            "meta-yoke:the-image.04 check_the_panel_draws_to_the_emulated_framebuffer" \
+            "meta-yoke:the-service-image.02 check_the_service_image_holds_a_deployment_of_the_example" \
+            "meta-yoke:the-service-image.03 check_the_init_system_starts_the_deployment" \
+            "meta-yoke:the-service-image.04 check_the_panel_draws_as_a_service"; do
   read -r id fn <<<"$each"
   if out="$("$fn" 2>&1)"; then say "$id" ""; else say "$id" "$out"; fi
 done

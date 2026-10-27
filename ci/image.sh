@@ -11,7 +11,7 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cache="${YOKE_YOCTO_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/meta-yoke}"
 engine="${CONTAINER_ENGINE:-podman}"
 image=localhost/meta-yoke-build
-cases=(meta-yoke:the-layer.04 meta-yoke:the-layer.05 meta-yoke:the-yoke-recipe.02 meta-yoke:the-c-and-cpp-recipes.02 meta-yoke:the-c-and-cpp-recipes.03 meta-yoke:the-rust-recipe.02 meta-yoke:the-python-recipes.02 meta-yoke:the-go-recipe.02 meta-yoke:the-reference-recipe.02 meta-yoke:the-image.02 meta-yoke:the-image.03 meta-yoke:the-image.04)
+cases=(meta-yoke:the-layer.04 meta-yoke:the-layer.05 meta-yoke:the-yoke-recipe.02 meta-yoke:the-c-and-cpp-recipes.02 meta-yoke:the-c-and-cpp-recipes.03 meta-yoke:the-rust-recipe.02 meta-yoke:the-python-recipes.02 meta-yoke:the-go-recipe.02 meta-yoke:the-reference-recipe.02 meta-yoke:the-image.02 meta-yoke:the-image.03 meta-yoke:the-image.04 meta-yoke:the-service-image.02 meta-yoke:the-service-image.03 meta-yoke:the-service-image.04)
 
 fail_all() { for id in "${cases[@]}"; do echo "FAIL  $id — $*"; done; exit 1; }
 

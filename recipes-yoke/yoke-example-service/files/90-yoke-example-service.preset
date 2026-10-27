@@ -1,0 +1,3 @@
+# The administrator's choice: this host runs the service deployment its composition names. It is read
+# before yoke-packaging's preset, which leaves the unit disabled on a host with no deployment.
+enable yoke.service

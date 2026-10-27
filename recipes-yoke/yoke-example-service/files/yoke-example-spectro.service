@@ -1,0 +1,16 @@
+# The spectrometer acquire drives, played by instrument on a pseudo-terminal linked at the stable name the
+# example's composition binds, /dev/spectro: a device the host has before Yoke runs, as a udev rule would
+# name a real one. The deployment's checks find it absent unless it is there first.
+[Unit]
+Description=The example's spectrometer, played by instrument
+Before=yoke.service
+
+[Service]
+Type=exec
+ExecStart=/usr/libexec/yoke-reference/instrument --link /dev/spectro
+# Started is not linked: the unit is ready once the name exists.
+ExecStartPost=/bin/sh -c 'for i in $(seq 100); do [ -e /dev/spectro ] && exit 0; sleep 0.1; done; exit 1'
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
