@@ -12,7 +12,7 @@ require ${BPN}-licenses.inc
 # The repository releases nothing, so the recipe pins a commit of main, moved by hand; every module its Go
 # programs depend on is fetched into the module cache, each pinned by its checksum.
 SRC_URI = "git://github.com/yoke-project/yoke-reference.git;protocol=https;branch=main"
-SRCREV = "ebef6a94588b704b16f7386b321f211c7b00de97"
+SRCREV = "ae1bb18064942ba60e57845121e6645d100bcdc7"
 require ${BPN}-go-mods.inc
 
 PV = "0+git"
@@ -56,26 +56,35 @@ do_compile() {
 }
 
 do_install() {
-	install -d ${D}${libexecdir}/yoke-reference ${D}${datadir}/yoke-reference/manifests
-	for program in acquire instrument clock; do
-		install -m 0755 ${B}/go-bin/$program ${D}${libexecdir}/yoke-reference/$program
+	# The Plugins and the panel as a distribution's packages put them for the service form: each Manifest in
+	# the scanned directory, each Plugin's executable where the Core resolves it from the identity, the
+	# panel's where a composition names it. instrument is the image's own device, run by its own unit.
+	for each in acquire:com.yoke.station.acquire clock:com.yoke.reference.clock; do
+		program="${each%%:*}" plugin="${each#*:}"
+		install -D -m 0644 ${S}/plugins/go/$program/manifest.yaml ${D}${sysconfdir}/yoke/plugins.d/$plugin/manifest.yaml
+		install -D -m 0755 ${B}/go-bin/$program ${D}${nonarch_libdir}/yoke/plugins/$plugin
 	done
-	install -m 0755 ${B}/panel ${D}${libexecdir}/yoke-reference/panel
-	install -m 0644 ${S}/plugins/go/acquire/manifest.yaml ${D}${datadir}/yoke-reference/manifests/com.yoke.station.acquire.yaml
-	install -m 0644 ${S}/plugins/go/clock/manifest.yaml ${D}${datadir}/yoke-reference/manifests/com.yoke.reference.clock.yaml
+	install -D -m 0755 ${B}/panel ${D}${nonarch_libdir}/yoke/interfaces/station-panel
+	install -D -m 0755 ${B}/go-bin/instrument ${D}${libexecdir}/yoke-reference/instrument
+	# The example as a device runs it: the application package, and the composition an administrator takes
+	# to run the same device as a service.
 	install -d ${D}${datadir}/yoke-reference/packages
 	install -m 0644 ${B}/station-device-out/*.yoke ${D}${datadir}/yoke-reference/packages/
+	install -D -m 0644 ${S}/applications/station/device.composition.yaml \
+		${D}${datadir}/yoke-reference/compositions/station-device.yaml
 }
 
-# One package per program, each with the Manifest its Plugin declares; and the example's package, which
+# One package per program, each with the Manifest its Plugin declares; the example's package, which
 # carries its own copies of acquire and the panel inside an archive the build does not look into: it needs
-# the libraries the panel links, which the build finds for the panel's own package.
-PACKAGES =+ "${PN}-acquire ${PN}-instrument ${PN}-clock ${PN}-panel ${PN}-station-device"
-FILES:${PN}-acquire = "${libexecdir}/yoke-reference/acquire ${datadir}/yoke-reference/manifests/com.yoke.station.acquire.yaml"
+# the libraries the panel links, which the build finds for the panel's own package; and the example's
+# service composition, a document for an administrator, which installs nothing in force.
+PACKAGES =+ "${PN}-acquire ${PN}-instrument ${PN}-clock ${PN}-panel ${PN}-station-device ${PN}-station-service"
+FILES:${PN}-acquire = "${sysconfdir}/yoke/plugins.d/com.yoke.station.acquire ${nonarch_libdir}/yoke/plugins/com.yoke.station.acquire"
 FILES:${PN}-instrument = "${libexecdir}/yoke-reference/instrument"
-FILES:${PN}-clock = "${libexecdir}/yoke-reference/clock ${datadir}/yoke-reference/manifests/com.yoke.reference.clock.yaml"
-FILES:${PN}-panel = "${libexecdir}/yoke-reference/panel"
+FILES:${PN}-clock = "${sysconfdir}/yoke/plugins.d/com.yoke.reference.clock ${nonarch_libdir}/yoke/plugins/com.yoke.reference.clock"
+FILES:${PN}-panel = "${nonarch_libdir}/yoke/interfaces/station-panel"
 FILES:${PN}-station-device = "${datadir}/yoke-reference/packages"
+FILES:${PN}-station-service = "${datadir}/yoke-reference/compositions"
 RDEPENDS:${PN}-station-device = "lvgl grpc protobuf-c libssl libcrypto"
 ALLOW_EMPTY:${PN} = "1"
 
