@@ -1,0 +1,7 @@
+# The machine: QEMU's 64-bit Arm, booted with runqemu.
+header:
+  version: 23
+  includes:
+    - kas/base.yml
+
+machine: qemuarm64

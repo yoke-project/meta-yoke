@@ -1,0 +1,19 @@
+# The machine: the Raspberry Pi 5, whose support layer is added to the build. The image is written to a
+# card and boots from it; its console is the debug connector's serial port and the screen.
+header:
+  version: 23
+  includes:
+    - kas/base.yml
+
+machine: raspberrypi5
+
+repos:
+  meta-raspberrypi:
+    url: https://git.yoctoproject.org/meta-raspberrypi
+    branch: wrynose
+    commit: 919588393f41b48cb6c5d832aa35e58a19b6762d
+
+local_conf_header:
+  raspberrypi5: |
+    # The kernel writes to the serial console as well as to the screen.
+    ENABLE_UART = "1"

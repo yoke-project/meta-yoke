@@ -22,14 +22,14 @@
 
 | Field | Value |
 | --- | --- |
-| **Cites** | prj_structure/97 §What a recipe pins, and what offline means · prj_structure/40 E1 |
+| **Cites** | prj_structure/97 §What a recipe pins, and what offline means · prj_structure/97 §meta-yoke, and what its recipes do · prj_structure/40 E1 |
 | **Level** | L1 |
 | **Method** | check |
 | **Not applicable in** | — |
 | **Label** | blocking |
 | **Precondition** | a clean checkout |
-| **Action** | read `ci/layers.lock` and the scripts that build an image |
-| **Expected** | the lock names BitBake, `openembedded-core` and `meta-openembedded`, each by a full commit; the scripts check each one out at that commit and at no branch, and the build host is a container this repository defines — so a build tomorrow is the build of today |
+| **Action** | read `kas/`, `ci/kas.yml` and the scripts that build an image |
+| **Expected** | `kas/base.yml` names BitBake, `openembedded-core` and `meta-openembedded`, each by a full commit, builds with no distribution and asks for `systemd` and `pam`; a file for each of `qemux86-64`, `qemuarm64` and `raspberrypi5` names its machine, the last pinning `meta-raspberrypi` by a full commit, a file for each form names its image, and every file includes the base; the image workflow checks the build out through the machine's file and builds the images the forms' files name, with kas pinned in a build host this repository defines, and no second list of commits is kept — so a build tomorrow is the build of today, and the one a reader runs |
 
 ## meta-yoke:the-layer.03 — an image is built on the project's runner, and never for a stranger's change
 

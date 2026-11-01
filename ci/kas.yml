@@ -1,0 +1,11 @@
+# What continuous integration adds to a reader's build: nothing that changes what is built. The image
+# workflow builds with the network off once everything is fetched, so the connectivity check, which needs it,
+# is not made. Added after a machine's file: kas/<machine>.yml:ci/kas.yml.
+header:
+  version: 23
+  includes:
+    - kas/base.yml
+
+local_conf_header:
+  ci: |
+    CONNECTIVITY_CHECK_URIS = ""

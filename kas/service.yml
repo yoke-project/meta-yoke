@@ -1,0 +1,8 @@
+# The service form: Yoke alone, its runtime and packaging inputs, with yoke.service left disabled until a
+# deployment is put in place.
+header:
+  version: 23
+  includes:
+    - kas/base.yml
+
+target: yoke-service-image

@@ -9,5 +9,6 @@ require recipes-core/images/core-image-minimal.bb
 
 IMAGE_INSTALL:append = " yoke-example-service"
 IMAGE_FEATURES += "allow-empty-password empty-root-password allow-root-login"
-# runqemu boots an uncompressed root filesystem.
-IMAGE_FSTYPES = "ext4"
+# runqemu boots an uncompressed root filesystem; another machine keeps the formats its layer gives it.
+IMAGE_FSTYPES:qemuall = "ext4"
+QB_DEFAULT_FSTYPE:qemuall = "ext4"

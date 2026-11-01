@@ -4,8 +4,9 @@ ask: inside the build host ci/image.sh starts, with the build's own QEMU, throug
 
 Prints one line per fact, `<name> <value>`, which ci/image-build.sh reads; a fact never read is absent.
 
-Usage: boot.py <build directory> <machine> <image> <screendump path> [application|service]
-  the form the image runs, application unless named, decides what is read
+Usage: boot.py <build directory> <machine> <image> <screendump path> [application|service|yoke|yoke-service]
+  the image's form, application unless named, decides what is read: application and service are the example
+  in each form, yoke and yoke-service are Yoke alone in each
 """
 import os
 import re
@@ -18,7 +19,8 @@ import pexpect
 build, machine, image, screendump = sys.argv[1:5]
 form = sys.argv[5] if len(sys.argv) > 5 else "application"
 monitor = os.path.join(build, "qemu-monitor.sock")
-account = "station"
+# The account that hosts the applications: the example's, or the one Yoke alone makes.
+account = "apps" if form == "yoke" else "station"
 prompt = "BOOT# "
 
 
@@ -120,6 +122,32 @@ def read_the_service():
         fact(f"unit-{unit}", out or "unknown")
 
 
+def read_yoke_alone():
+    """Yoke alone in the application form: the account, its guardian, no instance, and no service form."""
+    linger, _ = run(console, f"loginctl show-user {account} -p Linger --value")
+    state, _ = run(console, f"loginctl show-user {account} -p State --value")
+    fact("account", f"{linger}/{state}" if linger and state else "unknown")
+    out, status = run(console, f"for s in $(loginctl show-user {account} -p Sessions --value); do "
+                               "loginctl show-session $s -p Class --value; done | grep -c '^user'")
+    fact("signed-in", out or "unknown")
+    out, status = run(console, as_account("systemctl --user is-active yoke-guardian.service"))
+    fact("guardian", out.splitlines()[-1] if out else "unknown")
+    out, status = run(console, as_account("yoke instance list") + " | grep -c .")
+    fact("instances", out.splitlines()[-1] if out else "unknown")
+    out, status = run(console, "systemctl is-enabled yoke.service")
+    fact("service-unit", out.splitlines()[-1] if out else "unknown")
+
+
+def read_yoke_alone_as_a_service():
+    """Yoke alone in the service form: the unit waits, with no deployment, and the Core's configuration."""
+    out, status = run(console, "systemctl is-enabled yoke.service")
+    fact("service-enabled", out.splitlines()[-1] if out else "unknown")
+    out, status = run(console, "test -e /etc/yoke/deployment.yaml && echo present || echo absent")
+    fact("deployment", out.splitlines()[-1] if out else "unknown")
+    out, status = run(console, "test -f /etc/yoke/core.yaml && echo present || echo absent")
+    fact("core-config", out.splitlines()[-1] if out else "unknown")
+
+
 env = dict(os.environ)
 # runqemu draws nothing: QEMU's display is kept for the screendump the monitor takes, and shown nowhere.
 qemuparams = f"-display none -monitor unix:{monitor},server,nowait"
@@ -132,6 +160,8 @@ command = (f"runqemu {machine} {image} ext4 slirp serialstdio snapshot {kvm} "
 fact("command", command.replace(" ", "_"))
 console = pexpect.spawn("bash", ["-c", command], cwd=build, env=env, timeout=60)
 console.logfile_read = open(os.path.join(build, f"boot-{machine}.log" if form == "application" else f"boot-{machine}-{form}.log"), "wb")
+# Yoke alone draws nothing: no screendump is taken of it.
+draws = form in ("application", "service")
 
 try:
     # Under emulation an arm64 boot takes minutes; the first boot also installs the application.
@@ -148,19 +178,24 @@ try:
     fact("system", out.splitlines()[-1] if out else "unknown")
     if form == "service":
         read_the_service()
+    elif form == "yoke":
+        read_yoke_alone()
+    elif form == "yoke-service":
+        read_yoke_alone_as_a_service()
     else:
         read_the_application()
 
-    # The panel draws once it is running; the display is read after it has had time to.
-    time.sleep(10)
-    screendump_of_display()
-    fact("screendump", "taken" if os.path.exists(screendump) else "absent")
+    if draws:
+        # The panel draws once it is running; the display is read after it has had time to.
+        time.sleep(10)
+        screendump_of_display()
+        fact("screendump", "taken" if os.path.exists(screendump) else "absent")
 except pexpect.exceptions.ExceptionPexpect as e:
     fact("stopped", type(e).__name__)
 finally:
     # What the account's services said, kept in the boot's log for whoever reads a failure.
     try:
-        if form == "service":
+        if form in ("service", "yoke-service"):
             run(console, "journalctl -b --no-pager -u yoke.service | tail -150", timeout=120)
         else:
             run(console, f"journalctl -b --no-pager _UID=$(id -u {account}) | tail -150", timeout=120)
