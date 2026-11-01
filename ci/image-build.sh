@@ -418,10 +418,10 @@ yoke_alone() {
 }
 
 # std: meta-yoke:the-yoke-image.02
-check_yoke_alone_boots_into_an_account_whose_guardian_runs() {
+check_yoke_alone_boots_into_an_account_whose_guardian_has_run() {
   yoke_alone yoke "$yoke_target" "yoke yoke-core yoke-guardian yoke-packaging yoke-host" \
     "yoke-compose|yoke-conformance|yoke-reference-[a-z-]+|yoke-example-[a-z-]+|lvgl" \
-    "account=yes/lingering signed-in=0 guardian=active instances=0 service-unit=disabled"
+    "account=yes/lingering signed-in=0 guardian-enabled=enabled guardian=ran instances=0 service-unit=disabled"
 }
 
 # std: meta-yoke:the-yoke-image.03
@@ -546,7 +546,7 @@ for each in "meta-yoke:the-layer.04 check_the_layer_is_taken_into_a_build" \
             "meta-yoke:the-service-image.02 check_the_service_image_holds_a_deployment_of_the_example" \
             "meta-yoke:the-service-image.03 check_the_init_system_starts_the_deployment" \
             "meta-yoke:the-service-image.04 check_the_panel_draws_as_a_service" \
-            "meta-yoke:the-yoke-image.02 check_yoke_alone_boots_into_an_account_whose_guardian_runs" \
+            "meta-yoke:the-yoke-image.02 check_yoke_alone_boots_into_an_account_whose_guardian_has_run" \
             "meta-yoke:the-yoke-image.03 check_yoke_alone_as_a_service_waits_for_a_deployment"; do
   read -r id fn <<<"$each"
   if out="$("$fn" 2>&1)"; then say "$id" ""; else say "$id" "$out"; fi

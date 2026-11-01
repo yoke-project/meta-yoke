@@ -130,8 +130,16 @@ def read_yoke_alone():
     out, status = run(console, f"for s in $(loginctl show-user {account} -p Sessions --value); do "
                                "loginctl show-session $s -p Class --value; done | grep -c '^user'")
     fact("signed-in", out or "unknown")
-    out, status = run(console, as_account("systemctl --user is-active yoke-guardian.service"))
-    fact("guardian", out.splitlines()[-1] if out else "unknown")
+    out, status = run(console, as_account("systemctl --user is-enabled yoke-guardian.service"))
+    fact("guardian-enabled", out.splitlines()[-1] if out else "unknown")
+    # With no instance the guardian has nothing to watch, and exits: it ran if it is running, or ended well.
+    state = {}
+    for name in ("ActiveState", "Result", "ExecMainStatus", "ExecMainExitTimestampMonotonic"):
+        out, status = run(console, as_account(f"systemctl --user show yoke-guardian.service -p {name} --value"))
+        state[name] = out.splitlines()[-1] if out else ""
+    ran = state["ActiveState"] == "active" or (state["Result"] == "success" and state["ExecMainStatus"] == "0"
+                                               and state["ExecMainExitTimestampMonotonic"] not in ("", "0"))
+    fact("guardian", "ran" if ran else "/".join(state.values()) or "unknown")
     out, status = run(console, as_account("yoke instance list") + " | grep -c .")
     fact("instances", out.splitlines()[-1] if out else "unknown")
     out, status = run(console, "systemctl is-enabled yoke.service")
