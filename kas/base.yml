@@ -1,0 +1,45 @@
+# The build this layer is tested with: the layers it needs, each at one commit, and what every image of it
+# needs. A machine's file and a form's file are added to it on kas's command line:
+#
+#   kas build kas/qemux86-64.yml:kas/application.yml
+#
+# Each machine's and form's file includes this one, so either may come first.
+header:
+  version: 23
+
+distro: nodistro
+
+repos:
+  # This layer: the repository this file is in.
+  meta-yoke:
+
+  bitbake:
+    url: https://git.openembedded.org/bitbake
+    branch: "2.18"
+    commit: 6e260eb6ab1631607ea414d9ff8ede1155faa5d9
+    layers:
+      .: disabled
+
+  openembedded-core:
+    url: https://git.openembedded.org/openembedded-core
+    branch: wrynose
+    commit: 636e5d3b12d54951c13d57346648bc29a0e6b24e
+    layers:
+      meta:
+
+  meta-openembedded:
+    url: https://git.openembedded.org/meta-openembedded
+    branch: wrynose
+    commit: f28a144aa0a0ae05ca2ee91e1aef6aa05f6a12db
+    layers:
+      meta-oe:
+      meta-python:
+
+local_conf_header:
+  yoke: |
+    # systemd is the init system Yoke's units are written for; pam lets an account's user manager run,
+    # which the application form needs, and is what yoke-auth asks.
+    INIT_MANAGER = "systemd"
+    DISTRO_FEATURES:append = " pam"
+    # A recipe's work directory is removed once it is built, which keeps a build to tens of gigabytes.
+    INHERIT += "rm_work"

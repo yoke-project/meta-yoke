@@ -1,0 +1,8 @@
+# The application form: Yoke alone, with an account that hosts applications, lingers, and has its guardian
+# enabled; no application is installed.
+header:
+  version: 23
+  includes:
+    - kas/base.yml
+
+target: yoke-image

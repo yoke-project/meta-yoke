@@ -17,8 +17,10 @@ each repository builds itself with its own verbs, and this layer only describes 
 | `recipes-yoke/yoke-sdk-*/`, `recipes-yoke/python3-yoke-*/` | The five families: the C, C++ and Rust libraries for building against, the Python libraries for a device, the Go family's harnesses for a workstation |
 | `recipes-yoke/yoke-reference/` | The example's units that run on the host, the Go clock, and `com.yoke.station.device`, the example as a device runs it alone, composed in the build; the Plugins and the panel installed where the service form reads them, and the example's service composition for an administrator |
 | `recipes-graphics/lvgl/` | What the LVGL panel needs of the layers' LVGL: its framebuffer driver, and its library linked as it builds it |
-| `recipes-yoke/yoke-example-host/`, `recipes-yoke/yoke-example-service/`, `recipes-yoke/images/` | The two images this layer is tested with, one per form. In the application form, a host of the example whose first boot installs it and whose account's guardian brings it up; it needs the distro features `systemd` and `pam`. In the service form, a host that installs the example's composition, links the conventional path to it and enables `yoke.service`, which the init system starts. Tests of the layer, not products |
-| `checks/`, `ci/` | This repository's own checks, and the scripts continuous integration runs; `ci/image.sh` builds an image with the layer, in a build host it defines and at the revisions `ci/layers.lock` pins, and boots it under QEMU |
+| `recipes-yoke/yoke-host/`, `recipes-yoke/images/yoke-image.bb`, `recipes-yoke/images/yoke-service-image.bb` | Yoke alone, an image per form, which the forms' kas files build. In the application form, an account, `apps`, that may install applications, lingers and has its guardian enabled, with none installed; in the service form, the runtime and the inputs with `yoke.service` left disabled until a deployment is put in place. Starting points, not products |
+| `recipes-yoke/yoke-example-host/`, `recipes-yoke/yoke-example-service/`, `recipes-yoke/images/` | The two images of the example this layer is tested with, one per form. In the application form, a host of the example whose first boot installs it and whose account's guardian brings it up; it needs the distro features `systemd` and `pam`. In the service form, a host that installs the example's composition, links the conventional path to it and enables `yoke.service`, which the init system starts. Tests of the layer, not products |
+| `kas/` | The build this layer is tested in, as [kas](https://kas.readthedocs.io/) 5.5 files: `base.yml`, the layers it needs at their commits and what every image needs; a file per machine (`qemux86-64`, `qemuarm64`, `raspberrypi5`) and a file per form, which kas combines — `kas build meta-yoke/kas/qemux86-64.yml:meta-yoke/kas/application.yml`, run beside the layer's checkout |
+| `checks/`, `ci/` | This repository's own checks, and the scripts continuous integration runs; `ci/image.sh` builds an image with the layer through the files under `kas/`, in a build host it defines, and boots it under QEMU |
 
 ## Working on it
 
@@ -36,7 +38,7 @@ with the runner.
 | `just release` | Says there is nothing to publish yet |
 
 An image is built and booted with `ci/image.sh [machine ...]` — `qemux86-64` and `qemuarm64` unless named —
-which needs Podman and keeps the layers' checkouts, the downloads and the shared state under `~/.cache/meta-yoke`
+which needs Podman and keeps the layers kas checks out, the downloads and the shared state under `~/.cache/meta-yoke`
 (or `YOKE_YOCTO_CACHE`). A cold build of both machines takes hours and tens of gigabytes. Continuous
 integration runs it on a self-hosted runner labelled `yoke`, for every push to `main` and for a proposed
 change from this repository, never from a fork.

@@ -1,5 +1,5 @@
 # The host an image of this layer is built on: Ubuntu 24.04, one of the series' tested hosts, with the
-# packages the Yocto Project names for a build host. BitBake refuses to run as root, so the build runs as
+# packages the Yocto Project names for a build host, and kas at the version kas/ is written for. BitBake refuses to run as root, so the build runs as
 # the user who starts the container.
 FROM docker.io/library/ubuntu:24.04
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -9,3 +9,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && locale-gen en_US.UTF-8
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+# kas reads the build kas/ describes; installed for the system, which Ubuntu asks to be said.
+RUN pip3 install --no-cache-dir --break-system-packages kas==5.5

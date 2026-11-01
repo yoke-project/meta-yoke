@@ -1,69 +1,52 @@
 #!/usr/bin/env bash
-# The build itself, inside the build host ci/image.sh starts: the layers the lock names at their commits,
-# this layer added, and for each machine the image fetched and then built with the network off.
-# Prints one line per case, as checks/run.sh does.
+# The build itself, inside the build host ci/image.sh starts: for each machine, the build kas/ describes —
+# the machine's file, which includes the layers at their commits, and ci/kas.yml — the image fetched and then
+# built with the network off. A reader's build runs the same files. Prints one line per case, as
+# checks/run.sh does.
 set -uo pipefail
 
 layer=/layer/meta-yoke
 cache=/cache
 machines=("$@")
 (( ${#machines[@]} )) || machines=(qemux86-64 qemuarm64)
-mkdir -p "$HOME" "$cache/layers" "$cache/downloads" "$cache/sstate" "$cache/logs"
+mkdir -p "$HOME" "$cache/work" "$cache/downloads" "$cache/sstate" "$cache/logs"
+# kas checks the layers out under its work directory; downloads and shared state are one for all machines.
+export KAS_WORK_DIR="$cache/work" DL_DIR="$cache/downloads" SSTATE_DIR="$cache/sstate"
 status=0
 
 say() { if [[ -z "$2" ]]; then echo "pass  $1"; else echo "FAIL  $1 — $2"; status=1; fi; }
 
-# Each layer of the lock, at its commit and at no branch.
+# The configuration a machine is built with, and its build directory.
+config_for() { echo "$layer/kas/$1.yml:$layer/ci/kas.yml"; }
+
+# Each machine's build: its layers checked out at the commits kas/base.yml names, its configuration written.
 why=""
-while read -r name url commit; do
-  [[ -z "$name" || "$name" == \#* ]] && continue
-  dir="$cache/layers/$name"
-  [[ -d "$dir/.git" ]] || git clone -q --no-checkout "$url" "$dir" > /dev/null 2>&1 || { why="$name cannot be cloned"; break; }
-  git -C "$dir" cat-file -e "$commit^{commit}" 2> /dev/null || git -C "$dir" fetch -q origin > /dev/null 2>&1
-  git -C "$dir" -c advice.detachedHead=false checkout -q --force "$commit" > /dev/null 2>&1 || { why="$name has no commit $commit"; break; }
-done < "$layer/ci/layers.lock"
+for machine in "${machines[@]}"; do
+  [[ -f "$layer/kas/$machine.yml" ]] || { why="kas/ has no file for $machine"; break; }
+  KAS_BUILD_DIR="$cache/build-$machine" kas checkout "$(config_for "$machine")" > "$cache/logs/$machine-checkout.log" 2>&1 \
+    || { why="$machine's build cannot be checked out: $(grep -m2 ERROR "$cache/logs/$machine-checkout.log")"; break; }
+done
 if [[ -n "$why" ]]; then say meta-yoke:the-layer.04 "$why"; say meta-yoke:the-layer.05 "$why"; exit 1; fi
 
-# A build directory per machine; downloads and shared state are one for all.
-build_for() {
-  local machine="$1" build="$cache/build-$1"
-  mkdir -p "$build/conf"
-  cat > "$build/conf/bblayers.conf" <<CONF
-BBPATH = "\${TOPDIR}"
-BBFILES ?= ""
-BBLAYERS = "$cache/layers/openembedded-core/meta $cache/layers/meta-openembedded/meta-oe $cache/layers/meta-openembedded/meta-python $layer"
-CONF
-  cat > "$build/conf/local.conf" <<CONF
-MACHINE = "$machine"
-DISTRO = "nodistro"
-INIT_MANAGER = "systemd"
-# The example's host needs PAM, which nodistro leaves out.
-DISTRO_FEATURES:append = " pam"
-DL_DIR = "$cache/downloads"
-SSTATE_DIR = "$cache/sstate"
-BB_NUMBER_THREADS ?= "\${@oe.utils.cpu_count()}"
-PARALLEL_MAKE ?= "-j \${@oe.utils.cpu_count()}"
-CONNECTIVITY_CHECK_URIS = ""
-INHERIT += "rm_work"
-CONF
-  echo "$build"
-}
-
+# bitbake_in <build> <command ...>: the command in the build's environment, as kas shell sets it up, with no
+# checkout again. BB_NO_NETWORK is passed through to BitBake, which reads it from the environment.
 bitbake_in() {
-  local build="$1"; shift
-  # shellcheck disable=SC1091
-  (cd "$build" && export BBPATH="$build" PATH="$cache/layers/bitbake/bin:$cache/layers/openembedded-core/scripts:$PATH" PYTHONPATH="$cache/layers/bitbake/lib" \
-     BB_ENV_PASSTHROUGH_ADDITIONS="BB_NO_NETWORK" && "$@")
+  local build="$1" machine="${1##*/build-}"; shift
+  KAS_BUILD_DIR="$build" kas shell --skip repos_checkout "$(config_for "$machine")" \
+    -c "export BB_ENV_PASSTHROUGH_ADDITIONS=\"\${BB_ENV_PASSTHROUGH_ADDITIONS:-} BB_NO_NETWORK\"; $(printf '%q ' "$@")"
 }
 
-first="$(build_for "${machines[0]}")"
+first="$cache/build-${machines[0]}"
 
 # std: meta-yoke:the-layer.04
 check_the_layer_is_taken_into_a_build() {
   local log="$cache/logs/layers.log" parse="$cache/logs/parse.log"
   bitbake_in "$first" bitbake-layers show-layers > "$log" 2>&1 || { echo "the layers cannot be listed: $(tail -3 "$log")"; return 1; }
-  grep -qE "^yoke[[:space:]]+$layer[[:space:]]" "$log" \
-    || { echo "the build does not list the collection yoke from $layer: $(grep -E '^[a-z-]+ ' "$log" | awk '{print $1}' | tr '\n' ' ')"; return 1; }
+  # kas names each layer relative to the build directory; the path is compared once resolved.
+  local path
+  path="$(awk '$1 == "yoke" {print $2; exit}' "$log")"
+  [[ -n "$path" && "$(realpath -m "$path")" == "$layer" ]] \
+    || { echo "the build does not list the collection yoke from $layer: $(grep -E '^[a-z-]+ ' "$log" | awk '{print $1 "=" $2}' | tr '\n' ' ')"; return 1; }
   bitbake_in "$first" bitbake -p > "$parse" 2>&1 || { echo "the parse fails: $(grep -m3 ERROR "$parse")"; return 1; }
   if grep -qiE 'not compatible|LAYERSERIES' "$parse" "$log"; then
     echo "the layer is said to be incompatible: $(grep -m1 -hiE 'not compatible|LAYERSERIES' "$parse" "$log")"; return 1
@@ -75,10 +58,13 @@ check_the_layer_is_taken_into_a_build() {
 target="${YOKE_IMAGE:-yoke-example-image}"
 # The same example in the service form, an image of its own: each form is a promise the layer makes.
 service_target="${YOKE_SERVICE_IMAGE:-yoke-example-service-image}"
+# Yoke alone, in each form: the images the forms' files name, so that what a reader builds is what is tested.
+yoke_target="$(sed -n 's/^target: *//p' "$layer/kas/application.yml")"
+yoke_service_target="$(sed -n 's/^target: *//p' "$layer/kas/service.yml")"
 recipes="$(find "$layer"/recipes-* -name '*.bb' 2> /dev/null | sed -E 's#.*/([^/_]+)(_[^/]*)?\.bb$#\1#' | sort -u | tr '\n' ' ')"
 declare -A built=()
 for machine in "${machines[@]}"; do
-  build="$(build_for "$machine")"
+  build="$cache/build-$machine"
   log="$cache/logs/$machine-fetch.log"
   # Fetching is bound by the host's link, not its processors: a few downloads at a time leave the
   # runner's own connection to the forge room, which a download per processor starved. A fetch keeps
@@ -231,8 +217,8 @@ check_the_rust_recipe_builds_the_library() {
 check_the_python_recipes_build_the_libraries() {
   local why="" machine dir package top dist held module protobuf grpc versions file
   # The versions the series generates with: protobuf's major, and gRPC's generator.
-  protobuf="$(compgen -G "$cache/layers/meta-openembedded/meta-python/recipes-devtools/python/python3-protobuf_*.bb" | sed -E 's/.*_([0-9]+)\..*/\1/')"
-  grpc="$(compgen -G "$cache/layers/meta-openembedded/meta-python/recipes-devtools/python/python3-grpcio-tools_*.bb" | sed -E 's/.*_(.*)\.bb$/\1/')"
+  protobuf="$(compgen -G "$KAS_WORK_DIR/meta-openembedded/meta-python/recipes-devtools/python/python3-protobuf_*.bb" | sed -E 's/.*_([0-9]+)\..*/\1/')"
+  grpc="$(compgen -G "$KAS_WORK_DIR/meta-openembedded/meta-python/recipes-devtools/python/python3-grpcio-tools_*.bb" | sed -E 's/.*_(.*)\.bb$/\1/')"
   for machine in "${machines[@]}"; do
     [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
     for package in "python3-yoke-sdk yoke_sdk yoke_sdk" "python3-yoke-proto yoke yoke_proto"; do
@@ -391,11 +377,59 @@ for machine in "${machines[@]}"; do
   rm -f "$build/screendump-service-$machine.ppm"
   bitbake_in "$build" python3 "$layer/ci/boot.py" "$build" "$machine" "$service_target" "$build/screendump-service-$machine.ppm" service \
     > "$cache/logs/$machine-service-boot.facts" 2> "$cache/logs/$machine-service-boot.err"
+  # Yoke alone, in each form: the images a reader builds.
+  for form in yoke yoke-service; do
+    image="$yoke_target"; [[ "$form" == yoke-service ]] && image="$yoke_service_target"
+    bitbake_in "$build" python3 "$layer/ci/boot.py" "$build" "$machine" "$image" "$build/screendump-$form-$machine.ppm" "$form" \
+      > "$cache/logs/$machine-$form-boot.facts" 2> "$cache/logs/$machine-$form-boot.err"
+  done
 done
 
 # fact <machine> <name>: what the boot of a machine read, or nothing; sfact, the same of its service image.
 fact() { awk -v n="$2" '$1 == n {sub(/^[^ ]+ /, ""); print; exit}' "${booted[$1]:-/dev/null}"; }
 sfact() { [[ -n "${booted[$1]:-}" ]] || return 0; awk -v n="$2" '$1 == n {sub(/^[^ ]+ /, ""); print; exit}' "$cache/logs/$1-service-boot.facts"; }
+
+# yfact <machine> <form> <name>: what the boot of Yoke alone in a form read, or nothing.
+yfact() { [[ -n "${booted[$1]:-}" ]] || return 0; awk -v n="$3" '$1 == n {sub(/^[^ ]+ /, ""); print; exit}' "$cache/logs/$1-$2-boot.facts"; }
+
+# yoke_alone <form> <image> <holds> <holds not> <facts>: one image of Yoke alone, read in its manifest and booted.
+yoke_alone() {
+  local form="$1" image="$2" holds="$3" not="$4" facts="$5" why="" machine manifest package held name want got
+  for machine in "${machines[@]}"; do
+    [[ "${built[$machine]}" == ok ]] || { why+=" $machine ${built[$machine]};"; continue; }
+    manifest="$cache/build-$machine/tmp/deploy/images/$machine/$image-$machine.rootfs.manifest"
+    [[ -f "$manifest" ]] || { why+=" $machine's $image has no manifest;"; continue; }
+    for package in $holds; do
+      grep -qE "^$package " "$manifest" || why+=" $machine's $image does not hold $package;"
+    done
+    held="$(grep -E "^($not) " "$manifest" | awk '{print $1}' | tr '\n' ' ')"
+    [[ -z "$held" ]] || why+=" $machine's $image holds ${held% };"
+    if [[ "$(yfact "$machine" "$form" login)" != yes ]]; then
+      why+=" $machine's $image did not boot to a login ($(yfact "$machine" "$form" stopped)$(tail -2 "$cache/logs/$machine-$form-boot.err" 2> /dev/null | tr '\n' ' ')): $(tail -c 300 "$cache/build-$machine/boot-$machine-$form.log" 2> /dev/null | tr -d '\r' | tr '\n' ' ');"
+      continue
+    fi
+    for want in $facts; do
+      name="${want%%=*}" want="${want#*=}"
+      got="$(yfact "$machine" "$form" "$name")"
+      [[ "$got" == "$want" ]] || why+=" $machine's $image $name is '${got:-unread}', want '$want';"
+    done
+  done
+  [[ -z "$why" ]] || { echo "${why# }"; return 1; }
+}
+
+# std: meta-yoke:the-yoke-image.02
+check_yoke_alone_boots_into_an_account_whose_guardian_runs() {
+  yoke_alone yoke "$yoke_target" "yoke yoke-core yoke-guardian yoke-packaging yoke-host" \
+    "yoke-compose|yoke-conformance|yoke-reference-[a-z-]+|yoke-example-[a-z-]+|lvgl" \
+    "account=yes/lingering signed-in=0 guardian=active instances=0 service-unit=disabled"
+}
+
+# std: meta-yoke:the-yoke-image.03
+check_yoke_alone_as_a_service_waits_for_a_deployment() {
+  yoke_alone yoke-service "$yoke_service_target" "yoke yoke-core yoke-packaging" \
+    "yoke-guardian|yoke-compose|yoke-conformance|yoke-reference-[a-z-]+|yoke-example-[a-z-]+|lvgl" \
+    "system=running service-enabled=disabled deployment=absent core-config=present"
+}
 
 # std: meta-yoke:the-image.03
 check_the_image_boots_into_a_host_whose_guardian_brings_the_instance_up() {
@@ -511,7 +545,9 @@ for each in "meta-yoke:the-layer.04 check_the_layer_is_taken_into_a_build" \
             "meta-yoke:the-image.04 check_the_panel_draws_to_the_emulated_framebuffer" \
             "meta-yoke:the-service-image.02 check_the_service_image_holds_a_deployment_of_the_example" \
             "meta-yoke:the-service-image.03 check_the_init_system_starts_the_deployment" \
-            "meta-yoke:the-service-image.04 check_the_panel_draws_as_a_service"; do
+            "meta-yoke:the-service-image.04 check_the_panel_draws_as_a_service" \
+            "meta-yoke:the-yoke-image.02 check_yoke_alone_boots_into_an_account_whose_guardian_runs" \
+            "meta-yoke:the-yoke-image.03 check_yoke_alone_as_a_service_waits_for_a_deployment"; do
   read -r id fn <<<"$each"
   if out="$("$fn" 2>&1)"; then say "$id" ""; else say "$id" "$out"; fi
 done
