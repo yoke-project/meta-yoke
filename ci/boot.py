@@ -16,6 +16,9 @@ import time
 
 import pexpect
 
+from readers import as_account as as_the_account, read_yoke_alone as read_alone, \
+    read_yoke_alone_as_a_service as read_alone_as_a_service, run_on
+
 build, machine, image, screendump = sys.argv[1:5]
 form = sys.argv[5] if len(sys.argv) > 5 else "application"
 monitor = os.path.join(build, "qemu-monitor.sock")
@@ -28,26 +31,14 @@ def fact(name, value):
     print(f"{name} {value}", flush=True)
 
 
-# What systemd writes to a terminal around a session, and colours: neither is a command's output.
-terminal = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[A-Za-z]")
-
-
 def run(console, command, timeout=60):
-    """What a command printed on the console and its exit status, the prompt being one of the script's own.
-    The terminal echoes nothing, so what comes before the status is the command's output alone."""
-    console.sendline(f"{command}; echo \"status=$?\"")
-    # The serial console ends a line with more than one carriage return.
-    console.expect(r"status=(\d+)\r*\n", timeout=timeout)
-    out = terminal.sub("", console.before.decode(errors="replace")).replace("\r", "")
-    status = int(console.match.group(1))
-    console.expect_exact(prompt, timeout=timeout)
-    return out.strip(), status
+    """What a command printed on the console and its exit status (readers.run_on)."""
+    return run_on(console, prompt, command, timeout)
 
 
 def as_account(command):
-    """A command run as the account, with its user manager's runtime directory, as a signed-in user has it."""
-    return (f"su -s /bin/sh {account} -c 'XDG_RUNTIME_DIR=/run/user/$(id -u {account}) "
-            f"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u {account})/bus {command}'")
+    """A command run as the account, with its user manager's runtime directory (readers.as_account)."""
+    return as_the_account(account, command)
 
 
 def screendump_of_display():
@@ -123,37 +114,13 @@ def read_the_service():
 
 
 def read_yoke_alone():
-    """Yoke alone in the application form: the account, its guardian, no instance, and no service form."""
-    linger, _ = run(console, f"loginctl show-user {account} -p Linger --value")
-    state, _ = run(console, f"loginctl show-user {account} -p State --value")
-    fact("account", f"{linger}/{state}" if linger and state else "unknown")
-    out, status = run(console, f"for s in $(loginctl show-user {account} -p Sessions --value); do "
-                               "loginctl show-session $s -p Class --value; done | grep -c '^user'")
-    fact("signed-in", out or "unknown")
-    out, status = run(console, as_account("systemctl --user is-enabled yoke-guardian.service"))
-    fact("guardian-enabled", out.splitlines()[-1] if out else "unknown")
-    # With no instance the guardian has nothing to watch, and exits: it ran if it is running, or ended well.
-    state = {}
-    for name in ("ActiveState", "Result", "ExecMainStatus", "ExecMainExitTimestampMonotonic"):
-        out, status = run(console, as_account(f"systemctl --user show yoke-guardian.service -p {name} --value"))
-        state[name] = out.splitlines()[-1] if out else ""
-    ran = state["ActiveState"] == "active" or (state["Result"] == "success" and state["ExecMainStatus"] == "0"
-                                               and state["ExecMainExitTimestampMonotonic"] not in ("", "0"))
-    fact("guardian", "ran" if ran else "/".join(state.values()) or "unknown")
-    out, status = run(console, as_account("yoke instance list") + " | grep -c .")
-    fact("instances", out.splitlines()[-1] if out else "unknown")
-    out, status = run(console, "systemctl is-enabled yoke.service")
-    fact("service-unit", out.splitlines()[-1] if out else "unknown")
+    """Yoke alone in the application form, as ci/readers.py reads it."""
+    read_alone(lambda command, timeout=60: run(console, command, timeout), fact, account)
 
 
 def read_yoke_alone_as_a_service():
-    """Yoke alone in the service form: the unit waits, with no deployment, and the Core's configuration."""
-    out, status = run(console, "systemctl is-enabled yoke.service")
-    fact("service-enabled", out.splitlines()[-1] if out else "unknown")
-    out, status = run(console, "test -e /etc/yoke/deployment.yaml && echo present || echo absent")
-    fact("deployment", out.splitlines()[-1] if out else "unknown")
-    out, status = run(console, "test -f /etc/yoke/core.yaml && echo present || echo absent")
-    fact("core-config", out.splitlines()[-1] if out else "unknown")
+    """Yoke alone in the service form, as ci/readers.py reads it."""
+    read_alone_as_a_service(lambda command, timeout=60: run(console, command, timeout), fact)
 
 
 env = dict(os.environ)
