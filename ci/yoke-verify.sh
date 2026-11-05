@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Puts the published verification tool on PATH, in the user's bin directory, at the version given or,
 # with none, the newest the release manifest names. The archive is authenticated by the digest on its
-# line in the manifest; on a difference nothing is installed.
-# Usage: yoke-verify.sh [version]
+# line in the manifest; on a difference nothing is installed. Given a commit of yoke instead, it builds the
+# tool there with the Go on PATH — for the time between a change the descriptions need and the release that
+# publishes it (653), and said as such; ci/yoke-verify.commit, while it exists, names that commit when no
+# version is given, and goes when the release does.
+# Usage: yoke-verify.sh [version | commit]
 set -euo pipefail
 
 manifest="${YOKE_MANIFEST:-https://raw.githubusercontent.com/yoke-project/yoke/main/releases/manifest.jsonl}"
@@ -17,6 +20,21 @@ case "$(uname -m)" in
   *) echo "develop: no yoke-verify is published for $(uname -m)"; exit 1 ;;
 esac
 
+pin="${YOKE_VERIFY_PIN:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/yoke-verify.commit}"
+if [[ -z "$version" && -f "$pin" ]]; then
+  version="$(tr -d '[:space:]' < "$pin")"
+fi
+if [[ "$version" =~ ^[0-9a-f]{12,40}$ ]]; then
+  mkdir -p "$bin"
+  GOBIN="$bin" go install "github.com/yoke-project/yoke/cmd/yoke-verify@$version" \
+    || { echo "develop: yoke-verify cannot be built from yoke's commit $version"; exit 1; }
+  taken="built from yoke's commit $version, which no release has published yet"
+  installed=yes
+elif [[ -n "$version" && ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "develop: '$version' is neither a version of yoke-verify nor a commit of yoke"; exit 1
+fi
+
+if [[ -z "${installed:-}" ]]; then
 lines="$(curl -fsSL "$manifest")" || { echo "develop: the release manifest cannot be read from $manifest"; exit 1; }
 published="\"published\":\"yoke-verify-linux-$architecture\""
 if [[ -z "$version" ]]; then
@@ -44,6 +62,7 @@ fi
 tar -xzf "$work/$archive" -C "$work" yoke-verify
 mkdir -p "$bin"
 install -m 0755 "$work/yoke-verify" "$bin/yoke-verify"
+fi
 
 # A runner whose PATH does not reach the directory names a path file; the steps after this one have the
 # directory at the head of their PATH.

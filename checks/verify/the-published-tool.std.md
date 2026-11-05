@@ -27,7 +27,7 @@
 | **Method** | check |
 | **Not applicable in** | — |
 | **Label** | blocking |
-| **Precondition** | a release manifest naming `yoke-verify` `9.9.8` and `9.9.10`, each with its archive, and an empty user `bin` directory at the head of `PATH` |
+| **Precondition** | a release manifest naming `yoke-verify` `9.9.8` and `9.9.10`, each with its archive, and an empty user `bin` directory at the head of `PATH`; no commit pinned in `ci/yoke-verify.commit` |
 | **Action** | run `just develop` with no parameter |
 | **Expected** | it exits zero with `9.9.10` installed — the newest by version and not by text — and says that none was given |
 
@@ -95,3 +95,16 @@
 | **Precondition** | a release manifest naming `yoke-verify` `9.9.9` with its archive, a user `bin` directory that `PATH` does not reach, and a path file of continuous integration named by `GITHUB_PATH` |
 | **Action** | run `just develop "" 9.9.9` against them, once with the path file and once without |
 | **Expected** | with the path file, it exits zero, the user `bin` directory is the file's last line, and `develop` says the steps after it reach the tool; without one, it exits non-zero saying that `PATH` does not reach the directory — a self-hosted runner needs no step of its own to put the directory on `PATH` |
+
+## meta-yoke:the-published-tool.08 — given a commit of `yoke`, `develop` builds the tool there and says no release published it
+
+| Field | Value |
+| --- | --- |
+| **Cites** | testing/20 §The environments · testing/40 §A record |
+| **Level** | L1 |
+| **Method** | check |
+| **Not applicable in** | — |
+| **Label** | blocking |
+| **Precondition** | a stand-in `go` on `PATH` that notes what it is asked and writes a `yoke-verify` into `GOBIN`; no manifest reachable |
+| **Action** | `just develop "" <a commit of yoke>`; `just develop "" <a word that is neither a version nor a commit>`; and `just develop` with `ci/yoke-verify.commit` naming a commit |
+| **Expected** | the first exits zero, having asked `go install github.com/yoke-project/yoke/cmd/yoke-verify@<the commit>` with `GOBIN` the user's `bin` directory, reading no manifest, and says the tool was built from that commit and that no release has published it; the second exits non-zero naming the word; the third builds the tool at the commit the file names, as the first — the tool a release has not published yet is taken only from a commit named, until the release that carries what the descriptions need (653) |
