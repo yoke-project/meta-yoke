@@ -32,19 +32,21 @@ from readers import read_yoke_alone, read_yoke_alone_as_a_service, run_on  # noq
 def the_application_form_boots_into_an_account_whose_guardian_has_run():
     return "meta-yoke:the-board-pass.05", {
         "account": "yes/lingering", "signed-in": "0", "guardian-enabled": "enabled", "guardian": "ran",
-        "instances": "0", "service-unit": "disabled", "display": "taken"}
+        "instances": "0", "service-unit": "disabled", "display": "drawn"}
 
 
 # std: meta-yoke:the-board-pass.06
 def the_service_form_boots_with_its_unit_waiting():
     return "meta-yoke:the-board-pass.06", {
         "system": "running", "service-enabled": "disabled", "deployment": "absent", "core-config": "present",
-        "display": "taken"}
+        "display": "drawn"}
 
 
 CASES = {"yoke": the_application_form_boots_into_an_account_whose_guardian_has_run,
          "yoke-service": the_service_form_boots_with_its_unit_waiting}
 ACCOUNT = "apps"
+# The size a photograph is sampled at to class it.
+SAMPLE = (480, 270)
 PROMPT = "BOARD# "
 
 
@@ -140,6 +142,28 @@ def capture_node(video_root, name):
     return f"/dev/video{min(found)}" if found else None
 
 
+def photograph(ffmpeg, node, path):
+    """One photograph of the display, the last frame of five seconds, classed by what it shows: drawn, blank, or
+    the capture device's own screen for no signal — light yellow on black — or failed."""
+    done = subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error", "-f", "v4l2", "-video_size", "1920x1080",
+                           "-i", node, "-t", "5", "-update", "1", "-y", path], capture_output=True, text=True)
+    if done.returncode != 0 or not os.path.exists(path) or os.path.getsize(path) == 0:
+        return "failed"
+    # Sampled, never averaged: a console's thin text averaged away would read as blank.
+    pixels = subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error", "-i", path, "-vf",
+                             f"scale={SAMPLE[0]}:{SAMPLE[1]}:flags=neighbor", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                            capture_output=True).stdout
+    size = SAMPLE[0] * SAMPLE[1] * 3
+    if len(pixels) < size:
+        return "failed"
+    rgb = [tuple(pixels[i:i + 3]) for i in range(0, size, 3)]
+    if sum(1 for r, g, b in rgb if r > 150 and g > 170 and b < 140) > len(rgb) // 200:
+        return "no signal"
+    if max(max(p) for p in rgb) < 24:
+        return "blank"
+    return "drawn"
+
+
 def main():
     p = argparse.ArgumentParser(description="The board pass: one form's boot on a real board.")
     p.add_argument("--form", choices=sorted(CASES), required=True)
@@ -179,6 +203,10 @@ def main():
     log = open(os.path.join(a.out, f"{form}-console.log"), "wb")
     console = Console(a.port, log)
     started = time.monotonic()
+
+    def run(command, timeout=60):
+        return run_on(console, PROMPT, command, timeout)
+
     stage, previous = "the kernel", "the power"
     stopped = None
     try:
@@ -194,9 +222,6 @@ def main():
         half = len(PROMPT) // 2
         console.sendline(f"stty -echo; export PS1='{PROMPT[:half]}''{PROMPT[half:]}' SYSTEMD_COLORS=0 SYSTEMD_PAGER=")
         console.expect_exact(PROMPT, timeout=60)
-
-        def run(command, timeout=60):
-            return run_on(console, PROMPT, command, timeout)
 
         stage, previous = "the system running", "the shell"
         out, _ = run("systemctl is-system-running --wait", timeout=a.running_timeout)
@@ -214,20 +239,23 @@ def main():
             f.write(stopped + "\n")
     timings.close()
 
-    # The display, as a person sees it: one frame from the capture device, a second after it is opened.
+    # The display, as a person sees it. A capture device shows black, then its own screen, for seconds after it
+    # is opened with no signal, so the frame kept is the last of five seconds; and one that lost the signal with
+    # the board's power does not lock again until the board sets its display's mode, so a frame with nothing
+    # drawn is followed by the board's framebuffer blanked and unblanked, and a second photograph — said as such.
     node = capture_node(a.video_root, a.capture)
-    display = "absent"
-    if node and stopped is None:
-        photograph = os.path.join(a.out, f"{form}-display.png")
-        done = subprocess.run([a.ffmpeg, "-hide_banner", "-loglevel", "error", "-f", "v4l2", "-video_size",
-                               "1920x1080", "-i", node, "-ss", "1", "-frames:v", "1", "-y", photograph],
-                              capture_output=True, text=True)
-        display = "taken" if done.returncode == 0 and os.path.getsize(photograph) > 0 else "failed"
-    elif node is None:
-        display = "absent"
+    if node is None:
+        fact("display", "absent")
+    elif stopped is not None:
+        fact("display", "not taken")
     else:
-        display = "not taken"
-    fact("display", display)
+        first = photograph(a.ffmpeg, node, os.path.join(a.out, f"{form}-display.png"))
+        fact("display-first", first)
+        seen = first
+        if first != "drawn":
+            run("echo 1 > /sys/class/graphics/fb0/blank; sleep 1; echo 0 > /sys/class/graphics/fb0/blank", timeout=30)
+            seen = photograph(a.ffmpeg, node, os.path.join(a.out, f"{form}-display.png"))
+        fact("display", seen)
 
     if stopped is None:
         # Powered off, so that the person can take the medium out.
