@@ -57,12 +57,8 @@ class Console:
     Every byte read is kept in the console's log."""
 
     def __init__(self, port, log):
-        self.fd = os.open(port, os.O_RDWR | os.O_NOCTTY)
-        if os.isatty(self.fd):
-            tty.setraw(self.fd)
-            attrs = termios.tcgetattr(self.fd)
-            attrs[4] = attrs[5] = termios.B115200
-            termios.tcsetattr(self.fd, termios.TCSANOW, attrs)
+        self.port = port
+        self.fd = self._open()
         self.log = log
         self.pending = b""
         self.before = b""
@@ -71,16 +67,43 @@ class Console:
     def sendline(self, line):
         os.write(self.fd, line.encode() + b"\r")
 
+    def _open(self):
+        fd = os.open(self.port, os.O_RDWR | os.O_NOCTTY)
+        if os.isatty(fd):
+            tty.setraw(fd)
+            attrs = termios.tcgetattr(fd)
+            attrs[4] = attrs[5] = termios.B115200
+            termios.tcsetattr(fd, termios.TCSANOW, attrs)
+        return fd
+
     def _read(self, deadline):
         import select
-        ready, _, _ = select.select([self.fd], [], [], max(0.0, min(1.0, deadline - time.monotonic())))
-        if ready:
-            data = os.read(self.fd, 4096)
-            if not data:
-                raise OSError("the console closed")
-            self.log.write(data)
-            self.log.flush()
-            self.pending += data
+        try:
+            ready, _, _ = select.select([self.fd], [], [], max(0.0, min(1.0, deadline - time.monotonic())))
+            data = os.read(self.fd, 4096) if ready else None
+        except OSError:
+            data = b""
+        if data is None:
+            return
+        if not data:
+            # A USB serial port powered by the board goes with its power and comes back under its name: it is
+            # opened again, and what was being waited for is still waited for, until the deadline.
+            try:
+                os.close(self.fd)
+            except OSError:
+                pass
+            self.log.write(b"\n[board.py: the port went away; opening it again]\n")
+            while True:
+                try:
+                    self.fd = self._open()
+                    return
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("the port did not come back")
+                    time.sleep(0.2)
+        self.log.write(data)
+        self.log.flush()
+        self.pending += data
 
     def expect(self, pattern, timeout=60):
         regex = re.compile(pattern.encode() if isinstance(pattern, str) else pattern)

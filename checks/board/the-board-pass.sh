@@ -173,3 +173,14 @@ if len(re.findall(r"(?m)^\s*if: always\(\)", text)) < 2:
     raise SystemExit("the record's steps do not run whatever the pass decided")
 PY
 }
+
+# std: meta-yoke:the-board-pass.08
+check_a_port_that_goes_with_the_power_is_opened_again() {
+  local dir; dir="$(mktemp -d)"
+  bp_video "$dir/video" "UGREEN 25773"
+  bp_pass "$dir" yoke UGREEN "replug $dir/ttyACM0"
+  [[ "$(cat "$dir/status")" == 0 ]] || { echo "the pass exited $(cat "$dir/status"): $(tail -3 "$dir/lines")"; return 1; }
+  bp_has "$dir/lines" "pass  meta-yoke:the-board-pass.05" || return 1
+  grep -q "set -o pipefail" "$bp_root/.github/workflows/board.yml" \
+    || { echo "the workflow's step takes the exit status of the pipe's last command"; return 1; }
+}

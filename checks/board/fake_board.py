@@ -3,8 +3,10 @@
 and a login, then answers each line it is sent as a shell would, the commands found first in the stand-ins
 directory. It prints the terminal's path on its first line, and runs until it is powered off or killed.
 
-Usage: fake_board.py <stand-ins directory> <root> [silent]
-  root is where the board's /etc is; silent prints the kernel's line and nothing after it.
+Usage: fake_board.py <stand-ins directory> <root> [silent | replug <link>]
+  root is where the board's /etc is; silent prints the kernel's line and nothing after it; replug prints
+  what a board's power makes of a USB serial port — a few NULs, then the port gone — and comes back on a
+  new terminal the link given is pointed at, as the port's name comes back when the board is powered again.
 """
 import os
 import pty
@@ -16,10 +18,15 @@ import tty
 
 stand_ins, root = sys.argv[1], sys.argv[2]
 silent = len(sys.argv) > 3 and sys.argv[3] == "silent"
+replug = sys.argv[4] if len(sys.argv) > 4 and sys.argv[3] == "replug" else None
 
 master, slave = pty.openpty()
 tty.setraw(slave)
-print(os.ttyname(slave), flush=True)
+if replug:
+    os.symlink(os.ttyname(slave), replug)
+    print(replug, flush=True)
+else:
+    print(os.ttyname(slave), flush=True)
 
 
 def say(text):
@@ -37,6 +44,18 @@ def lines():
 
 
 time.sleep(1)
+if replug:
+    # The power: the port says nothing but NULs, then is gone, and comes back under its name.
+    os.write(master, b"\0" * 22)
+    time.sleep(0.5)
+    os.close(master)
+    os.close(slave)
+    time.sleep(1)
+    master, slave = pty.openpty()
+    tty.setraw(slave)
+    os.unlink(replug)
+    os.symlink(os.ttyname(slave), replug)
+    time.sleep(1)
 say("\nRPi: BOOTLOADER release VERSION:fake\n[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x414fd0b1]\n")
 if silent:
     while True:
