@@ -14,9 +14,9 @@
 | **Method** | test |
 | **Not applicable in** | — |
 | **Label** | blocking |
-| **Precondition** | a fake board on a pseudo-terminal: it prints a kernel's first line, then a login, then answers as a shell whose `loginctl`, `systemctl`, `su` and `yoke` say what `yoke-image` says; a fake capture device named `UGREEN 25773` beside one named `HP HD Camera`, and a stand-in for `ffmpeg` that writes the frame it is asked for |
+| **Precondition** | a fake board on a pseudo-terminal: it prints a kernel's first line, then a login, then answers as a shell whose `loginctl`, `systemctl`, `su` and `yoke` say what `yoke-image` says; a fake capture device named `UGREEN 25773` beside one named `HP HD Camera`, and a stand-in for `ffmpeg` that writes the frame it is asked for, showing a screen with something drawn |
 | **Action** | run `ci/board.py` for the form `yoke`, the person's act stated as the image written |
-| **Expected** | it exits 0; its lines carry the facts `the-yoke-image.02` reads, `account=yes/lingering signed-in=0 guardian-enabled=enabled guardian=ran instances=0 service-unit=disabled`, and `pass  meta-yoke:the-board-pass.05`; the record holds the act as stated, the facts, the seconds to the kernel, to the login and to the system running, the photograph taken from `UGREEN 25773` and never from the camera, and the console's log |
+| **Expected** | it exits 0; its lines carry the facts `the-yoke-image.02` reads, `account=yes/lingering signed-in=0 guardian-enabled=enabled guardian=ran instances=0 service-unit=disabled`, `display-first drawn`, `display drawn` and `pass  meta-yoke:the-board-pass.05`; the record holds the act as stated, the facts, the seconds to the kernel, to the login and to the system running, the photograph taken from `UGREEN 25773` and never from the camera, and the console's log |
 
 ## meta-yoke:the-board-pass.02 — in the service form, the script reads the facts of the service form
 
@@ -29,7 +29,7 @@
 | **Label** | blocking |
 | **Precondition** | the fake board of `.01`, answering as `yoke-service-image` does |
 | **Action** | run `ci/board.py` for the form `yoke-service` |
-| **Expected** | it exits 0; its lines carry `system=running service-enabled=disabled deployment=absent core-config=present` and `pass  meta-yoke:the-board-pass.06`; the record holds the photograph and the timings as in `.01` |
+| **Expected** | it exits 0; its lines carry `system=running service-enabled=disabled deployment=absent core-config=present`, `display drawn` and `pass  meta-yoke:the-board-pass.06`; the record holds the photograph and the timings as in `.01` |
 
 ## meta-yoke:the-board-pass.03 — with no capture device of the name given, the display is said absent and the pass fails
 
@@ -68,7 +68,7 @@
 | **Label** | blocking |
 | **Precondition** | `yoke-image` for `raspberrypi5`, built from the layer at the head, written by a person to the board's card; the board's serial console and its display's capture device wired to the runner |
 | **Action** | the person powers the board on; the `board` workflow reads its console |
-| **Expected** | the board boots to a login; the facts are those of `the-yoke-image.02` — the account `apps` lingers with no one signed in, its guardian is enabled and has run, it has no instance, `yoke.service` is disabled — and the display is photographed |
+| **Expected** | the board boots to a login; the facts are those of `the-yoke-image.02` — the account `apps` lingers with no one signed in, its guardian is enabled and has run, it has no instance, `yoke.service` is disabled — and the display is photographed, and something is drawn on it |
 
 ## meta-yoke:the-board-pass.06 — on the board, the service form's image boots with the service form's unit waiting
 
@@ -81,7 +81,7 @@
 | **Label** | blocking |
 | **Precondition** | `yoke-service-image` for `raspberrypi5`, built from the layer at the head, written by a person to the board's card; the console and the capture device as in `.05` |
 | **Action** | the person powers the board on; the `board` workflow reads its console |
-| **Expected** | the board boots to a login with the system running; the facts are those of `the-yoke-image.03` — `yoke.service` disabled, no `/etc/yoke/deployment.yaml`, `/etc/yoke/core.yaml` present — and the display is photographed |
+| **Expected** | the board boots to a login with the system running; the facts are those of `the-yoke-image.03` — `yoke.service` disabled, no `/etc/yoke/deployment.yaml`, `/etc/yoke/core.yaml` present — and the display is photographed, and something is drawn on it |
 
 ## meta-yoke:the-board-pass.07 — the board workflow is started by hand alone, on the runner beside the board, and hands its record over
 
@@ -108,3 +108,16 @@
 | **Precondition** | a fake board whose port, when powered, says a few NULs and is gone, then comes back under the same name before the kernel's first line, as a USB serial port powered by the board does |
 | **Action** | run `ci/board.py` for the form `yoke` against the port's name |
 | **Expected** | it exits 0 and its case passes: the script opened the port again and read the boot as in `.01`; and the board workflow's step that runs it fails when the case fails, its exit status being the script's and not the last command's in a pipe |
+
+## meta-yoke:the-board-pass.09 — a display with nothing drawn is lit again once, said so, and fails if it stays so
+
+| Field | Value |
+| --- | --- |
+| **Cites** | testing/20 §The board pass |
+| **Level** | L1 |
+| **Method** | test |
+| **Not applicable in** | — |
+| **Label** | blocking |
+| **Precondition** | the fake board of `.01`; a capture that shows, in turn, the capture device's own *no signal* screen and then a drawn one; and captures that show *no signal*, or black, every time |
+| **Action** | run `ci/board.py` for the form `yoke` against each |
+| **Expected** | the frame is read after the capture device has had seconds to lock, and classed `drawn`, `blank` or `no signal`; one not drawn makes the script set the board's display mode again from its console — blanking the framebuffer and unblanking it — and photograph once more; the first passes with `display-first no signal` and `display drawn`, both photographs asked; the others exit 1 with `display no signal` and `display blank` and the case failing on the display — a capture device that loses the signal when the board's power goes is lit again, and said to have been, and a display that shows nothing never passes |

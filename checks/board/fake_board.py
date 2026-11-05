@@ -82,7 +82,7 @@ for line in lines():
         time.sleep(1)
         os.close(master)
         sys.exit(0)
-    # The board's /etc is the fake's root's.
-    command = line.replace("/etc/yoke", f"{root}/etc/yoke")
+    # The board's /etc and its framebuffer's controls are the fake's root's, never the host's.
+    command = line.replace("/etc/yoke", f"{root}/etc/yoke").replace("/sys/class/graphics", f"{root}/sys/class/graphics")
     done = subprocess.run(["sh", "-c", command], env=env, capture_output=True, text=True)
     say(done.stdout + done.stderr + prompt)
