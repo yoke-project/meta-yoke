@@ -1,0 +1,54 @@
+# L5's board row, the board pass (testing/20): an image of this layer booted on a real board, at the cut. A
+# person writes the form's image to the board's medium, starts this workflow naming the form and what was
+# written, and powers the board on; ci/board.py reads the rest. It runs on the runner the board's console and
+# display are wired to, which is up for the pass alone, and is never started by a change.
+name: board
+
+on:
+  workflow_dispatch:
+    inputs:
+      form:
+        description: the form whose image is on the medium
+        type: choice
+        options: [yoke, yoke-service]
+        required: true
+      wrote:
+        description: what was written to the medium, as the person wrote it
+        type: string
+        required: true
+
+# One board, so one pass at a time.
+concurrency: board
+
+jobs:
+  board:
+    runs-on: [self-hosted, board]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: extractions/setup-just@v4
+        with:
+          just-version: 1.58.0
+      - run: just develop
+      - name: The pass
+        env:
+          FORM: ${{ inputs.form }}
+          WROTE: ${{ inputs.wrote }}
+        run: |
+          mkdir -p .results/board
+          date -u +%Y-%m-%dT%H:%M:%SZ > .results/started
+          echo "$FORM" > .results/form
+          status=0
+          python3 ci/board.py --form "$FORM" --wrote "$WROTE" --out .results/board | tee .results/board.log || status=1
+          grep -E '^(pass|FAIL)  ' .results/board.log > .results/board.txt || true
+          date -u +%Y-%m-%dT%H:%M:%SZ > .results/finished
+          exit "$status"
+      - run: ci/record.sh L5 board .results > record-L5-board.json
+        if: always()
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: record-L5-board-${{ inputs.form }}
+          path: |
+            record-L5-board.json
+            .results/board/

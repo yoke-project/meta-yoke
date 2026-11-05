@@ -155,3 +155,21 @@ check_a_board_with_no_login_stops_the_pass() {
     || { echo "the pass does not say where it stopped: $(tail -3 "$dir/lines")"; return 1; }
   grep -qE "^FAIL  meta-yoke:the-board-pass.05" "$dir/lines" || { echo "the case does not fail"; return 1; }
 }
+
+# std: meta-yoke:the-board-pass.07
+check_the_board_workflow_is_started_by_hand_alone() {
+  local wf="$bp_root/.github/workflows/board.yml"
+  [[ -f "$wf" ]] || { echo "no board workflow"; return 1; }
+  python3 - "$wf" <<'PY' || return 1
+import re, sys
+text = open(sys.argv[1]).read()
+on = re.search(r"(?ms)^on:\n(.*?)^\S", text)
+if not on or re.findall(r"(?m)^  (\w+):", on.group(1)) != ["workflow_dispatch"]:
+    raise SystemExit("it is started by something other than workflow_dispatch")
+for each in ("form:", "wrote:", "runs-on: [self-hosted, board]", "ci/board.py", "ci/record.sh L5 board", "upload-artifact"):
+    if each not in text:
+        raise SystemExit(f"it does not hold {each}")
+if len(re.findall(r"(?m)^\s*if: always\(\)", text)) < 2:
+    raise SystemExit("the record's steps do not run whatever the pass decided")
+PY
+}

@@ -121,3 +121,37 @@ check_nothing_a_run_writes_enters_the_tree() {
   seen="$(cd "$root" && git status --porcelain | grep -F '.results' || true)"
   [[ -z "$seen" ]] || { echo "a run left the results in the tree: $seen"; return 1; }
 }
+
+# std: meta-yoke:the-record-of-a-run.06
+check_the_board_pass_record_is_the_board_row() {
+  [[ -x "$record_script" ]] || { echo "no ci/record.sh"; return 1; }
+  local tmp written
+  tmp="$(mktemp -d)"
+  printf 'pass  meta-yoke:the-board-pass.05\n' > "$tmp/board.txt"
+  echo yoke > "$tmp/form"
+  date -u +%Y-%m-%dT%H:%M:%SZ > "$tmp/started"
+  date -u +%Y-%m-%dT%H:%M:%SZ > "$tmp/finished"
+  if ! written="$("$record_script" L5 board "$tmp" 2>"$tmp/said")"; then
+    echo "the script refused the results: $(cat "$tmp/said")"; rm -rf "$tmp"; return 1
+  fi
+  rm -rf "$tmp"
+  python3 - "$written" <<'PY' || return 1
+import json, sys
+record = json.loads(sys.argv[1])
+if record["level"] != "L5" or record["tier"] != "board":
+    raise SystemExit(f'the record is of {record["level"]} {record["tier"]}')
+env = record["environment"]
+want = {"machine": "raspberrypi5", "deployment form": "application", "architecture": "arm64"}
+for k, v in want.items():
+    if env.get(k) != v:
+        raise SystemExit(f"the environment fixes {k} as {env.get(k)!r}, not {v}")
+results = {c["id"]: c["result"] for c in record["cases"]}
+if results.get("meta-yoke:the-board-pass.05") != "pass":
+    raise SystemExit(f'the board case is {results.get("meta-yoke:the-board-pass.05")}')
+others = {i: r for i, r in results.items() if i != "meta-yoke:the-board-pass.05" and r != "not applicable"}
+if others:
+    raise SystemExit(f"other L5 cases are in the board row: {others}")
+if record["state"] != "passed":
+    raise SystemExit(f'the state is {record["state"]}')
+PY
+}

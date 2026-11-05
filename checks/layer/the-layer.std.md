@@ -51,7 +51,7 @@
 | **Cites** | prj_structure/97 §meta-yoke, and what its recipes do · prj_structure/85 §The series |
 | **Level** | L5 |
 | **Method** | test |
-| **Not applicable in** | — |
+| **Not applicable in** | machine: raspberrypi5 |
 | **Label** | blocking |
 | **Precondition** | a build of the layers the lock names, in the container this repository defines |
 | **Action** | add the layer; list the build's layers; parse every recipe |
@@ -64,7 +64,7 @@
 | **Cites** | prj_structure/97 §What a recipe pins, and what offline means · prj_structure/40 E2 · testing/20 §The levels |
 | **Level** | L5 |
 | **Method** | test |
-| **Not applicable in** | — |
+| **Not applicable in** | machine: raspberrypi5 |
 | **Label** | blocking |
 | **Precondition** | the build of `.04`, for `qemux86-64` and for `qemuarm64`, with `systemd` as the init system |
 | **Action** | fetch everything the image needs; then build the image with the network off |

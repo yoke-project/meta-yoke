@@ -64,7 +64,7 @@
 | **Cites** | testing/20 §The board pass · arch/25-guardian/02 §How it comes to be running |
 | **Level** | L5 |
 | **Method** | test |
-| **Not applicable in** | — |
+| **Not applicable in** | machine: qemu · deployment form: service |
 | **Label** | blocking |
 | **Precondition** | `yoke-image` for `raspberrypi5`, built from the layer at the head, written by a person to the board's card; the board's serial console and its display's capture device wired to the runner |
 | **Action** | the person powers the board on; the `board` workflow reads its console |
@@ -77,8 +77,21 @@
 | **Cites** | testing/20 §The board pass · arch/00-system/02 §The service form on disk |
 | **Level** | L5 |
 | **Method** | test |
-| **Not applicable in** | — |
+| **Not applicable in** | machine: qemu · deployment form: application |
 | **Label** | blocking |
 | **Precondition** | `yoke-service-image` for `raspberrypi5`, built from the layer at the head, written by a person to the board's card; the console and the capture device as in `.05` |
 | **Action** | the person powers the board on; the `board` workflow reads its console |
 | **Expected** | the board boots to a login with the system running; the facts are those of `the-yoke-image.03` — `yoke.service` disabled, no `/etc/yoke/deployment.yaml`, `/etc/yoke/core.yaml` present — and the display is photographed |
+
+## meta-yoke:the-board-pass.07 — the board workflow is started by hand alone, on the runner beside the board, and hands its record over
+
+| Field | Value |
+| --- | --- |
+| **Cites** | testing/20 §The board pass · testing/40 §A record |
+| **Level** | L1 |
+| **Method** | check |
+| **Not applicable in** | — |
+| **Label** | blocking |
+| **Precondition** | a clean checkout |
+| **Action** | read `.github/workflows/board.yml` |
+| **Expected** | it is started by `workflow_dispatch` alone, naming the form and what was written to the medium; it runs on `[self-hosted, board]`; it runs `ci/board.py`, keeps its case's line and the form, assembles the record with `ci/record.sh L5 board` and hands the record and what the pass wrote over as artifacts, those two steps run whatever the pass decided |
