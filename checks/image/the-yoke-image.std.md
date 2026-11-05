@@ -25,7 +25,7 @@
 | **Cites** | arch/25-guardian/02 · testing/20 §The levels |
 | **Level** | L5 |
 | **Method** | test |
-| **Not applicable in** | — |
+| **Not applicable in** | machine: raspberrypi5 |
 | **Label** | blocking |
 | **Precondition** | the build of `the-layer.05`, for `qemux86-64` and `qemuarm64`; QEMU built by the same build |
 | **Action** | read the image's manifest; boot the image under QEMU and, on its serial console, read the account, its guardian's unit, its instances and `yoke.service` |
@@ -38,7 +38,7 @@
 | **Cites** | arch/00-system/02 §The service form on disk · testing/20 §The levels |
 | **Level** | L5 |
 | **Method** | test |
-| **Not applicable in** | — |
+| **Not applicable in** | machine: raspberrypi5 |
 | **Label** | blocking |
 | **Precondition** | the build of `the-layer.05`, for `qemux86-64` and `qemuarm64`; QEMU built by the same build |
 | **Action** | read the image's manifest; boot the image under QEMU and, on its serial console, read `yoke.service`, the deployment link and the Core's configuration |

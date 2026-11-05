@@ -25,7 +25,7 @@
 | **Cites** | prj_structure/97 §meta-yoke, and what its recipes do · prj_structure/40 E2 · testing/20 §The levels |
 | **Level** | L5 |
 | **Method** | test |
-| **Not applicable in** | — |
+| **Not applicable in** | machine: raspberrypi5 |
 | **Label** | blocking |
 | **Precondition** | the build of `the-layer.05`, for `qemux86-64` and `qemuarm64` |
 | **Action** | read the service image's manifest |
@@ -38,7 +38,7 @@
 | **Cites** | arch/97-trace/07 §Starting it · arch/00-system/02 §The service form on disk · testing/20 §The levels |
 | **Level** | L5 |
 | **Method** | test |
-| **Not applicable in** | — |
+| **Not applicable in** | machine: raspberrypi5 |
 | **Label** | blocking |
 | **Precondition** | the image of `.02`, for each machine; QEMU built by the same build |
 | **Action** | boot the image under QEMU; on its serial console, as root, read the init system's unit, the composition in force, and the deployment through the manager |
@@ -51,7 +51,7 @@
 | **Cites** | testing/20 §The levels · prj_structure/97 §meta-yoke, and what its recipes do |
 | **Level** | L5 |
 | **Method** | test |
-| **Not applicable in** | — |
+| **Not applicable in** | machine: raspberrypi5 |
 | **Label** | blocking |
 | **Precondition** | the boot of `.03`, for each machine, with the deployment's units running |
 | **Action** | take a screendump of QEMU's display |

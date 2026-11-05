@@ -69,3 +69,16 @@
 | **Precondition** | a clean checkout |
 | **Action** | ask git whether what a run writes is ignored |
 | **Expected** | it is, and nothing under it is ever reported as a change — a contributor who runs the verbs has nothing to undo and nothing to commit by mistake |
+
+## meta-yoke:the-record-of-a-run.06 — the board pass's record is L5's board row, of the board's cases alone
+
+| Field | Value |
+| --- | --- |
+| **Cites** | testing/20 §The board pass · testing/20 §The environments · testing/40 §A record |
+| **Level** | L1 |
+| **Method** | check |
+| **Not applicable in** | — |
+| **Label** | blocking |
+| **Precondition** | a directory of results the board pass left for the form `yoke`: its case's line passing, the form, and the instants it started and finished |
+| **Action** | run the script that assembles the record over it, as L5's board row |
+| **Expected** | one record of level `L5`, tier `board`, whose environment fixes `machine` `raspberrypi5`, `deployment form` `application` and `architecture` `arm64`; it holds `the-board-pass.05` passed, every other L5 case — the emulated machines' and the service form's — not applicable, and `state` passed |

@@ -25,7 +25,7 @@
 | **Cites** | prj_structure/97 §meta-yoke, and what its recipes do · prj_structure/40 E3 · prj_structure/40 E2 |
 | **Level** | L5 |
 | **Method** | test |
-| **Not applicable in** | — |
+| **Not applicable in** | machine: raspberrypi5 |
 | **Label** | blocking |
 | **Precondition** | the build of `the-layer.04`, for `qemux86-64` and `qemuarm64` |
 | **Action** | fetch `python3-yoke-proto` and `python3-yoke-sdk`; build them with the network off; list what their packages hold, and read their generated modules |
