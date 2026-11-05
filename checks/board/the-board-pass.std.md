@@ -95,3 +95,16 @@
 | **Precondition** | a clean checkout |
 | **Action** | read `.github/workflows/board.yml` |
 | **Expected** | it is started by `workflow_dispatch` alone, naming the form and what was written to the medium; it runs on `[self-hosted, board]`; it runs `ci/board.py`, keeps its case's line and the form, assembles the record with `ci/record.sh L5 board` and hands the record and what the pass wrote over as artifacts, those two steps run whatever the pass decided |
+
+## meta-yoke:the-board-pass.08 — a serial port that goes with the board's power is opened again, and the pass goes on
+
+| Field | Value |
+| --- | --- |
+| **Cites** | testing/20 §The board pass |
+| **Level** | L1 |
+| **Method** | test |
+| **Not applicable in** | — |
+| **Label** | blocking |
+| **Precondition** | a fake board whose port, when powered, says a few NULs and is gone, then comes back under the same name before the kernel's first line, as a USB serial port powered by the board does |
+| **Action** | run `ci/board.py` for the form `yoke` against the port's name |
+| **Expected** | it exits 0 and its case passes: the script opened the port again and read the boot as in `.01`; and the board workflow's step that runs it fails when the case fails, its exit status being the script's and not the last command's in a pipe |

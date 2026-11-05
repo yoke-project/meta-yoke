@@ -35,6 +35,7 @@ jobs:
           FORM: ${{ inputs.form }}
           WROTE: ${{ inputs.wrote }}
         run: |
+          set -o pipefail
           mkdir -p .results/board
           date -u +%Y-%m-%dT%H:%M:%SZ > .results/started
           echo "$FORM" > .results/form
