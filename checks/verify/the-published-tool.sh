@@ -35,7 +35,7 @@ published_tool_release() {
 published_tool_develop() {
   local dir="$1"
   shift
-  (cd "$root" && YOKE_MANIFEST="file://$dir/manifest.jsonl" YOKE_DOWNLOADS="file://$dir" \
+  (cd "$root" && YOKE_VERIFY_PIN="$dir/no-pin" YOKE_MANIFEST="file://$dir/manifest.jsonl" YOKE_DOWNLOADS="file://$dir" \
     XDG_BIN_HOME="$dir/bin" PATH="$dir/bin:$PATH" just develop "$@" 2>&1)
 }
 
@@ -155,6 +155,43 @@ check_develop_hands_its_directory_to_the_steps_after_it() {
     echo "develop passed with no path file and PATH not reaching the tool: $out"; status=1
   elif ! grep -q "which PATH does not reach" <<<"$out"; then
     echo "develop does not say PATH does not reach the tool: $out"; status=1
+  fi
+  rm -rf "$dir"
+  return "$status"
+}
+
+# std: meta-yoke:the-published-tool.08
+check_develop_builds_the_tool_at_a_commit_given() {
+  local dir out status=0 commit=0123456789abcdef0123456789abcdef01234567
+  dir="$(mktemp -d)"
+  mkdir -p "$dir/bin" "$dir/go"
+  cat > "$dir/go/go" <<'GO'
+#!/bin/sh
+echo "$* GOBIN=$GOBIN" >> "$(dirname "$0")/asked"
+printf '#!/bin/sh\necho "yoke-verify built"\n' > "$GOBIN/yoke-verify"
+chmod +x "$GOBIN/yoke-verify"
+GO
+  chmod +x "$dir/go/go"
+  out="$(cd "$root" && YOKE_MANIFEST="file://$dir/none.jsonl" XDG_BIN_HOME="$dir/bin" \
+         PATH="$dir/bin:$dir/go:$PATH" just develop "" "$commit" 2>&1)" || { echo "develop failed: $out"; status=1; }
+  if (( status == 0 )); then
+    grep -qF "install github.com/yoke-project/yoke/cmd/yoke-verify@$commit GOBIN=$dir/bin" "$dir/go/asked" 2>/dev/null \
+      || { echo "go was not asked to install the tool at the commit: $(cat "$dir/go/asked" 2>/dev/null)"; status=1; }
+    grep -q "built from yoke's commit $commit.*no release" <<<"$out" || { echo "develop does not say what it took: $out"; status=1; }
+  fi
+  if out="$(cd "$root" && YOKE_MANIFEST="file://$dir/none.jsonl" XDG_BIN_HOME="$dir/bin" \
+           PATH="$dir/bin:$dir/go:$PATH" just develop "" nightly 2>&1)"; then
+    echo "a word was taken: $out"; status=1
+  elif ! grep -q "nightly" <<<"$out"; then
+    echo "the refusal does not name the word: $out"; status=1
+  fi
+  # The pin, while it exists, names the commit when no version is given.
+  local pinned; pinned="$(cat "$root/ci/yoke-verify.commit" 2>/dev/null | tr -d '[:space:]')"
+  if [[ -n "$pinned" ]]; then
+    : > "$dir/go/asked"
+    out="$(cd "$root" && YOKE_MANIFEST="file://$dir/none.jsonl" XDG_BIN_HOME="$dir/bin" \
+           PATH="$dir/bin:$dir/go:$PATH" just develop 2>&1)" || { echo "develop with the pin failed: $out"; status=1; }
+    grep -qF "yoke-verify@$pinned" "$dir/go/asked" || { echo "the pin's commit was not built: $out"; status=1; }
   fi
   rm -rf "$dir"
   return "$status"
