@@ -185,6 +185,20 @@ GO
   elif ! grep -q "nightly" <<<"$out"; then
     echo "the refusal does not name the word: $out"; status=1
   fi
+  # With no go, the container engine builds it in the Go image.
+  cat > "$dir/go/engine" <<'ENGINE'
+#!/bin/sh
+echo "$*" >> "$(dirname "$0")/engine.asked"
+out="$(echo "$*" | sed -E 's/.*-v ([^ :]+):\/out.*/\1/')"
+printf '#!/bin/sh\necho "yoke-verify built"\n' > "$out/yoke-verify"; chmod +x "$out/yoke-verify"
+ENGINE
+  chmod +x "$dir/go/engine"
+  rm -f "$dir/bin/yoke-verify"
+  out="$(cd "$root" && YOKE_VERIFY_GO=no-such-go CONTAINER_ENGINE="$dir/go/engine" YOKE_MANIFEST="file://$dir/none.jsonl" \
+         XDG_BIN_HOME="$dir/bin" PATH="$dir/bin:$dir/go:$PATH" just develop "" "$commit" 2>&1)" \
+    || { echo "develop with no go failed: $out"; status=1; }
+  grep -qE "golang:.* go install github.com/yoke-project/yoke/cmd/yoke-verify@$commit" "$dir/go/engine.asked" 2>/dev/null \
+    || { echo "the engine was not asked to build the tool in the Go image: $(cat "$dir/go/engine.asked" 2>/dev/null)"; status=1; }
   # The pin, while it exists, names the commit when no version is given.
   local pinned; pinned="$(cat "$root/ci/yoke-verify.commit" 2>/dev/null | tr -d '[:space:]')"
   if [[ -n "$pinned" ]]; then

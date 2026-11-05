@@ -26,8 +26,21 @@ if [[ -z "$version" && -f "$pin" ]]; then
 fi
 if [[ "$version" =~ ^[0-9a-f]{12,40}$ ]]; then
   mkdir -p "$bin"
-  GOBIN="$bin" go install "github.com/yoke-project/yoke/cmd/yoke-verify@$version" \
-    || { echo "develop: yoke-verify cannot be built from yoke's commit $version"; exit 1; }
+  module="github.com/yoke-project/yoke/cmd/yoke-verify@$version"
+  if command -v "${YOKE_VERIFY_GO:-go}" > /dev/null; then
+    GOBIN="$bin" "${YOKE_VERIFY_GO:-go}" install "$module" \
+      || { echo "develop: yoke-verify cannot be built from yoke's commit $version"; exit 1; }
+  else
+    # A runner with no Go builds it in the Go image, statically, as the user, into the user's bin directory.
+    engine="${CONTAINER_ENGINE:-podman}"
+    command -v "$engine" > /dev/null \
+      || { echo "develop: neither go nor $engine is on PATH to build yoke-verify from yoke's commit $version"; exit 1; }
+    user_args=(--user "$(id -u):$(id -g)")
+    [[ "$(basename "$engine")" == podman ]] && user_args=(--userns=keep-id)
+    "$engine" run --rm "${user_args[@]}" -e CGO_ENABLED=0 -e GOBIN=/out -e GOPATH=/tmp/go -e GOCACHE=/tmp/cache \
+      -e GOFLAGS=-modcacherw -v "$bin:/out" docker.io/library/golang:1.26 go install "$module" \
+      || { echo "develop: yoke-verify cannot be built from yoke's commit $version in the Go image"; exit 1; }
+  fi
   taken="built from yoke's commit $version, which no release has published yet"
   installed=yes
 elif [[ -n "$version" && ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
