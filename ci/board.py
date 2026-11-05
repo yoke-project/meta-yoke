@@ -67,7 +67,12 @@ class Console:
         self.match = None
 
     def sendline(self, line):
-        os.write(self.fd, line.encode() + b"\r")
+        # In pieces a board's serial port keeps up with: a long line written at once lost characters on a
+        # Raspberry Pi 5's console, and the shell read a command it was never sent.
+        data = line.encode() + b"\r"
+        for i in range(0, len(data), 16):
+            os.write(self.fd, data[i:i + 16])
+            time.sleep(0.005)
 
     def _open(self):
         fd = os.open(self.port, os.O_RDWR | os.O_NOCTTY)
