@@ -10,8 +10,8 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327 \
 # The two archives the release publishes, each pinned by the digest its manifest line carries.
 SRC_URI = "https://github.com/yoke-project/yoke/releases/download/v${PV}/yoke-${PV}-source.tar.gz;name=source \
            https://github.com/yoke-project/yoke/releases/download/v${PV}/yoke-${PV}-modules.tar.gz;name=modules"
-SRC_URI[source.sha256sum] = "a96c14357cde223ce615f36746cc3f06cacf35e3a27d0b57801a03fb5ecb50bf"
-SRC_URI[modules.sha256sum] = "a294fd028cc956876fafe4b94e5e79aa38e5dcca5699dfa7c4d5b4cd636ac421"
+SRC_URI[source.sha256sum] = "ea7baa368205181c2e1a705c51b1158322757080fe2f5d98d06ccdf2666b9dfb"
+SRC_URI[modules.sha256sum] = "a920ff15fea358de2f238c058d4fa23d0eb27f10514f86333b1361c4c55031c2"
 
 # Both archives unpack into yoke-<version>/: the modules archive is the vendor/ directory of that tree.
 S = "${UNPACKDIR}/yoke-${PV}"
