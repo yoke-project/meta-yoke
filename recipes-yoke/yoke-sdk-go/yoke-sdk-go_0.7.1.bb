@@ -12,7 +12,7 @@ require ${BPN}-licenses.inc
 # The module the family publishes, as the Go proxy serves it: the zip whose h1: digest its manifest line
 # carries, pinned by its own checksum.
 SRC_URI = "https://proxy.golang.org/github.com/yoke-project/yoke-sdk-go/@v/v${PV}.zip;downloadfilename=yoke-sdk-go-v${PV}.zip;subdir=module"
-SRC_URI[sha256sum] = "8a0f706eeb0d20fff60a1220449e1ad33e05d9ebe5bb00559eb3c56ac1d08bc1"
+SRC_URI[sha256sum] = "bb7e425eb84655524623eacaa96ec29c5d9971c407761e0762a6abb638d57863"
 require ${BPN}-go-mods.inc
 
 S = "${UNPACKDIR}/module/github.com/yoke-project/yoke-sdk-go@v${PV}"
