@@ -14,7 +14,7 @@ DEFINITIONS_VERSION = "v0.4.0"
 # module its definitions were generated from, as the Go proxy serves it.
 SRC_URI = "https://github.com/yoke-project/yoke-sdk-cpp/releases/download/v${PV}/yoke-sdk-cpp-${PV}-source.tar.gz \
            https://proxy.golang.org/github.com/yoke-project/yoke/proto/@v/${DEFINITIONS_VERSION}.zip;name=definitions;downloadfilename=yoke-proto-${DEFINITIONS_VERSION}.zip;subdir=definitions-module"
-SRC_URI[sha256sum] = "621d377ae23a1679aa65cb1e6aa7708b2c12bb62a7360e4c1b505da386b7bf9d"
+SRC_URI[sha256sum] = "bcfaabaf153dc6f985b5daf03479b0529fab4a80d736249a589e84905b7b89d8"
 SRC_URI[definitions.sha256sum] = "2c8ebc82eb168c5998318698a8ce8a47766d067d2e5212445408146db1c68aea"
 
 S = "${UNPACKDIR}/yoke-sdk-cpp-${PV}"
