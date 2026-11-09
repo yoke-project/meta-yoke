@@ -8,8 +8,9 @@ on:
   pull_request:
   workflow_dispatch:
 
-# One image build at a time: they share the runner's downloads and shared state.
-concurrency: image
+# One image build at a time: they share the runner's downloads and shared state, and the one runner with this
+# job's labels runs one job at a time. The queue is that runner's: a concurrency group would keep one pending
+# run and cancel the others, and a change whose image was cancelled reads as checked.
 
 jobs:
   image:
