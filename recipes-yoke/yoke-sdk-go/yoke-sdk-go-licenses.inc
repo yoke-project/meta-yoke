@@ -5,7 +5,7 @@
 LICENSE += "& Apache-2.0 & BSD-3-Clause & MIT"
 
 LIC_FILES_CHKSUM += "\
-    file://pkg/mod/github.com/yoke-project/yoke/proto@v0.4.0/LICENSE;md5=86d3f3a95c324c9479bd8986968f4327;spdx=Apache-2.0 \
+    file://pkg/mod/github.com/yoke-project/yoke/proto@v0.5.0/LICENSE;md5=86d3f3a95c324c9479bd8986968f4327;spdx=Apache-2.0 \
     file://pkg/mod/go.yaml.in/yaml/v3@v3.0.5/LICENSE;md5=3c91c17266710e16afdbb2b6d15c761c;spdx=MIT+%26+Apache-2.0 \
     file://pkg/mod/golang.org/x/net@v0.57.0/LICENSE;md5=7998cb338f82d15c0eff93b7004d272a;spdx=BSD-3-Clause \
     file://pkg/mod/golang.org/x/sys@v0.47.0/LICENSE;md5=7998cb338f82d15c0eff93b7004d272a;spdx=BSD-3-Clause \
