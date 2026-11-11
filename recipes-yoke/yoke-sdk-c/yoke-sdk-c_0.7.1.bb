@@ -9,7 +9,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327 \
 
 # The archive the release publishes, pinned by the digest its manifest line carries.
 SRC_URI = "https://github.com/yoke-project/yoke-sdk-c/releases/download/v${PV}/yoke-sdk-c-${PV}-source.tar.gz"
-SRC_URI[sha256sum] = "93328b9c9a29cddce08600249dd64a2724777f35c41028297b0bfb4e78acf2c6"
+SRC_URI[sha256sum] = "d20e5db1f7bd98b1b5ce93629898859e7448df98b72968ac434bdab2043a2cd3"
 
 S = "${UNPACKDIR}/yoke-sdk-c-${PV}"
 
