@@ -11,7 +11,7 @@ LIC_FILES_CHKSUM = "file://yoke_proto-${PV}.dist-info/licenses/LICENSE;md5=86d3f
 # module at its version, as the Go proxy serves it. A wheel is a zip, unpacked as one.
 SRC_URI = "https://files.pythonhosted.org/packages/py3/y/yoke-proto/yoke_proto-${PV}-py3-none-any.whl;downloadfilename=yoke_proto-${PV}-py3-none-any.zip;subdir=wheel \
            https://proxy.golang.org/github.com/yoke-project/yoke/proto/@v/v${PV}.zip;name=definitions;downloadfilename=yoke-proto-v${PV}.zip;subdir=definitions-module"
-SRC_URI[sha256sum] = "41d9a5b7870cf49eca2880d2dcc881d74fd4c15ddf0b204d818e84ca596a8d5a"
+SRC_URI[sha256sum] = "3eaedac76296df957afbbff03bab9d8ee001851213df142b2217d6037eb4752e"
 SRC_URI[definitions.sha256sum] = "2c8ebc82eb168c5998318698a8ce8a47766d067d2e5212445408146db1c68aea"
 
 S = "${UNPACKDIR}/wheel"
