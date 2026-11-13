@@ -109,7 +109,7 @@
 | **Action** | run `ci/board.py` for the form `yoke` against the port's name |
 | **Expected** | it exits 0 and its case passes: the script opened the port again and read the boot as in `.01`; and the board workflow's step that runs it fails when the case fails, its exit status being the script's and not the last command's in a pipe |
 
-## meta-yoke:the-board-pass.09 — a display with nothing drawn is lit again once, said so, and fails if it stays so
+## meta-yoke:the-board-pass.09 — a display with nothing drawn is lit again, said so, and fails if it stays so
 
 | Field | Value |
 | --- | --- |
@@ -120,4 +120,17 @@
 | **Label** | blocking |
 | **Precondition** | the fake board of `.01`; a capture that shows, in turn, the capture device's own *no signal* screen and then a drawn one; and captures that show *no signal*, or black, every time |
 | **Action** | run `ci/board.py` for the form `yoke` against each |
-| **Expected** | the frame is read after the capture device has had seconds to lock, and classed `drawn`, `blank` or `no signal`; one not drawn makes the script set the board's display mode again from its console — blanking the framebuffer and unblanking it — and photograph once more; the first passes with `display-first no signal` and `display drawn`, both photographs asked; the others exit 1 with `display no signal` and `display blank` and the case failing on the display — a capture device that loses the signal when the board's power goes is lit again, and said to have been, and a display that shows nothing never passes |
+| **Expected** | the frame is read after the capture device has had seconds to lock, and classed `drawn`, `blank` or `no signal`; one not drawn makes the script set the board's display mode again from its console — blanking the framebuffer and unblanking it — and photograph again; the first passes with `display-first no signal` and `display drawn`, both photographs asked; the others exit 1 with `display no signal` and `display blank` and the case failing on the display — a capture device that loses the signal when the board's power goes is lit again, and said to have been, and a display that shows nothing never passes |
+
+## meta-yoke:the-board-pass.10 — the photograph is retried up to four times, and the count is recorded
+
+| Field | Value |
+| --- | --- |
+| **Cites** | testing/20 §The board pass |
+| **Level** | L1 |
+| **Method** | test |
+| **Not applicable in** | — |
+| **Label** | blocking |
+| **Precondition** | the fake board of `.01`; a capture that shows *no signal*, then black, then a drawn screen; one that shows *no signal* every time; and one drawn at once |
+| **Action** | run `ci/board.py` for the form `yoke` against each |
+| **Expected** | each attempt opens the capture device anew; the first passes with `display-first no signal`, `display drawn` and `display-attempts 3`, three photographs asked and the display lit again before each but the first; the second asks four photographs and no more, and exits 1 with `display no signal` and `display-attempts 4`; the third passes with `display-attempts 1` and one photograph; the record holds the count. After a cold power-on, how long the capture device takes to lock is then a measure and not a guess |

@@ -209,7 +209,7 @@ check_a_port_that_goes_with_the_power_is_opened_again() {
 }
 
 # std: meta-yoke:the-board-pass.09
-check_a_display_not_drawn_is_lit_again_once_and_said() {
+check_a_display_not_drawn_is_lit_again_and_said() {
   local dir; dir="$(mktemp -d)/a"
   bp_video "$dir/video" "UGREEN 25773"
   BP_SCREENS="nosignal drawn" bp_pass "$dir" yoke UGREEN ""
@@ -229,4 +229,30 @@ check_a_display_not_drawn_is_lit_again_once_and_said() {
     grep -qE "^FAIL  meta-yoke:the-board-pass.05 — .*display is ${each#*:}, not drawn" "$dir/lines" \
       || { echo "${each%%:*}: the case does not fail on the display: $(tail -1 "$dir/lines")"; return 1; }
   done
+}
+
+# std: meta-yoke:the-board-pass.10
+check_the_photograph_is_retried_and_counted() {
+  local dir; dir="$(mktemp -d)/a"
+  bp_video "$dir/video" "UGREEN 25773"
+  BP_SCREENS="nosignal blank drawn" bp_pass "$dir" yoke UGREEN ""
+  [[ "$(cat "$dir/status")" == 0 ]] || { echo "drawn at the third, the pass exited $(cat "$dir/status"): $(tail -3 "$dir/lines")"; return 1; }
+  bp_has "$dir/lines" "display-first no signal" || return 1
+  bp_has "$dir/lines" "display drawn" || return 1
+  bp_has "$dir/lines" "display-attempts 3" || return 1
+  [[ "$(grep -c "v4l2" "$dir/bin/ffmpeg.asked")" == 3 ]] || { echo "not photographed three times: $(grep -c v4l2 "$dir/bin/ffmpeg.asked")"; return 1; }
+  grep -rqs "display-attempts" "$dir/out" || { echo "the record does not hold the count"; return 1; }
+  dir="$(mktemp -d)/b"
+  bp_video "$dir/video" "UGREEN 25773"
+  BP_SCREENS="nosignal" bp_pass "$dir" yoke UGREEN ""
+  [[ "$(cat "$dir/status")" == 1 ]] || { echo "never drawn, the pass exited $(cat "$dir/status")"; return 1; }
+  bp_has "$dir/lines" "display no signal" || return 1
+  bp_has "$dir/lines" "display-attempts 4" || return 1
+  [[ "$(grep -c "v4l2" "$dir/bin/ffmpeg.asked")" == 4 ]] || { echo "not photographed four times: $(grep -c v4l2 "$dir/bin/ffmpeg.asked")"; return 1; }
+  dir="$(mktemp -d)/c"
+  bp_video "$dir/video" "UGREEN 25773"
+  bp_pass "$dir" yoke UGREEN ""
+  [[ "$(cat "$dir/status")" == 0 ]] || { echo "drawn at once, the pass exited $(cat "$dir/status")"; return 1; }
+  bp_has "$dir/lines" "display-attempts 1" || return 1
+  [[ "$(grep -c "v4l2" "$dir/bin/ffmpeg.asked")" == 1 ]] || { echo "photographed more than once"; return 1; }
 }
