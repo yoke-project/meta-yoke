@@ -45,6 +45,10 @@ def the_service_form_boots_with_its_unit_waiting():
 CASES = {"yoke": the_application_form_boots_into_an_account_whose_guardian_has_run,
          "yoke-service": the_service_form_boots_with_its_unit_waiting}
 ACCOUNT = "apps"
+# How many photographs the display is given to show something drawn: after a cold power-on the capture device
+# can take longer to lock than one attempt, and the count says how long it took.
+PHOTOGRAPH_ATTEMPTS = 4
+
 # The size a photograph is sampled at to class it.
 SAMPLE = (480, 270)
 PROMPT = "BOARD# "
@@ -247,19 +251,23 @@ def main():
     # The display, as a person sees it. A capture device shows black, then its own screen, for seconds after it
     # is opened with no signal, so the frame kept is the last of five seconds; and one that lost the signal with
     # the board's power does not lock again until the board sets its display's mode, so a frame with nothing
-    # drawn is followed by the board's framebuffer blanked and unblanked, and a second photograph — said as such.
+    # drawn is followed by the board's framebuffer blanked and unblanked and another photograph, the device
+    # opened anew, up to a fixed count — said as such, with how many it took.
     node = capture_node(a.video_root, a.capture)
     if node is None:
         fact("display", "absent")
     elif stopped is not None:
         fact("display", "not taken")
     else:
-        first = photograph(a.ffmpeg, node, os.path.join(a.out, f"{form}-display.png"))
-        fact("display-first", first)
-        seen = first
-        if first != "drawn":
-            run("echo 1 > /sys/class/graphics/fb0/blank; sleep 1; echo 0 > /sys/class/graphics/fb0/blank", timeout=30)
+        attempts, seen = 0, None
+        while attempts < PHOTOGRAPH_ATTEMPTS and seen != "drawn":
+            if attempts:
+                run("echo 1 > /sys/class/graphics/fb0/blank; sleep 1; echo 0 > /sys/class/graphics/fb0/blank", timeout=30)
             seen = photograph(a.ffmpeg, node, os.path.join(a.out, f"{form}-display.png"))
+            attempts += 1
+            if attempts == 1:
+                fact("display-first", seen)
+        fact("display-attempts", str(attempts))
         fact("display", seen)
 
     if stopped is None:
