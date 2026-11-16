@@ -129,7 +129,7 @@ SRC_URI += " \
     crate://crates.io/windows_x86_64_msvc/0.52.6 \
     crate://crates.io/x509-parser/0.18.1 \
     crate://crates.io/yasna/0.6.0 \
-    crate://crates.io/yoke-proto/0.4.0 \
+    crate://crates.io/yoke-proto/0.6.0 \
     crate://crates.io/zeroize/1.9.1 \
 "
 
@@ -260,5 +260,5 @@ SRC_URI[windows_x86_64_gnullvm-0.52.6.sha256sum] = "24d5b23dc417412679681396f2b4
 SRC_URI[windows_x86_64_msvc-0.52.6.sha256sum] = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 SRC_URI[x509-parser-0.18.1.sha256sum] = "d43b0f71ce057da06bc0851b23ee24f3f86190b07203dd8f567d0b706a185202"
 SRC_URI[yasna-0.6.0.sha256sum] = "b5f6765e852b9b4dc8e2a76843e4d64d1cea8e79bcde0b6901aea8e7c7f08282"
-SRC_URI[yoke-proto-0.4.0.sha256sum] = "0b60fb6a1d6e8c9ff4c72e962f92f65295159c3a3ba4092a8dc8ae0c248d4be1"
+SRC_URI[yoke-proto-0.6.0.sha256sum] = "d5d9d560d69b105dd6d556463aca16948875192a6ecb38fd38f6fb33a76d8ad7"
 SRC_URI[zeroize-1.9.1.sha256sum] = "e13084392c5e4bc371903e2935a5eaeed24905a7511356b883835e18a78f6879"
