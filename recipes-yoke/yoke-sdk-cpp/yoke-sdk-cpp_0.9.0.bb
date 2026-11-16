@@ -8,14 +8,14 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327 \
                     file://NOTICE;md5=d449f03f350dad45b01299df4ea73840"
 
 # The definitions version the archive's record pins.
-DEFINITIONS_VERSION = "v0.4.0"
+DEFINITIONS_VERSION = "v0.6.0"
 
 # The archive the release publishes, pinned by the digest its manifest line carries; and the definitions
 # module its definitions were generated from, as the Go proxy serves it.
 SRC_URI = "https://github.com/yoke-project/yoke-sdk-cpp/releases/download/v${PV}/yoke-sdk-cpp-${PV}-source.tar.gz \
            https://proxy.golang.org/github.com/yoke-project/yoke/proto/@v/${DEFINITIONS_VERSION}.zip;name=definitions;downloadfilename=yoke-proto-${DEFINITIONS_VERSION}.zip;subdir=definitions-module"
 SRC_URI[sha256sum] = "e8ea37656ab13d8fe89ea4cc8868e2bbcea4e6fc6acea7066fc0bbe8456cef49"
-SRC_URI[definitions.sha256sum] = "2c8ebc82eb168c5998318698a8ce8a47766d067d2e5212445408146db1c68aea"
+SRC_URI[definitions.sha256sum] = "a7ec23e6dd529abf446fde9abe7f15481389ddc990c63f4967b6638682f350f1"
 
 S = "${UNPACKDIR}/yoke-sdk-cpp-${PV}"
 
