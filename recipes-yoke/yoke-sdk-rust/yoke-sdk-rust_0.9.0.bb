@@ -9,7 +9,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327 \
 
 # The crate the family publishes, pinned by the digest its manifest line carries.
 SRC_URI = "crate://crates.io/yoke-sdk/${PV};name=yoke-sdk"
-SRC_URI[yoke-sdk.sha256sum] = "c3ec4dbb237cd85b4dc0a217cbda22417195046c2168094033afca6b093cc0fa"
+SRC_URI[yoke-sdk.sha256sum] = "2be2ddff3da50defccd3488caf6b446e884da353831921de1d60367d225ba5d2"
 
 S = "${CARGO_VENDORING_DIRECTORY}/yoke-sdk-${PV}"
 
