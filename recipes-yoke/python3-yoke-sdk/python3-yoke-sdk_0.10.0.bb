@@ -9,7 +9,7 @@ LIC_FILES_CHKSUM = "file://yoke_sdk-${PV}.dist-info/licenses/LICENSE;md5=86d3f3a
 # The wheel the release publishes, pinned by the digest its manifest line carries. A wheel is a zip,
 # unpacked as one.
 SRC_URI = "https://files.pythonhosted.org/packages/py3/y/yoke-sdk/yoke_sdk-${PV}-py3-none-any.whl;downloadfilename=yoke_sdk-${PV}-py3-none-any.zip;subdir=wheel"
-SRC_URI[sha256sum] = "bc5075a566e99154dcfbd1d256193cd2810f324c4a9ce8c7707f95427e09e8c6"
+SRC_URI[sha256sum] = "04942d8f3487e625db7fe69f7aad0a28c26050635bd4a0ebb78312d654d9ec5b"
 
 S = "${UNPACKDIR}/wheel"
 
