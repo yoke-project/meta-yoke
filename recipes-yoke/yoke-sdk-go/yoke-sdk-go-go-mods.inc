@@ -3,7 +3,7 @@
 # harnesses the recipe builds. Written again, never by hand, when the version changes.
 
 SRC_URI += "\
-    gomod://github.com/yoke-project/yoke/proto;version=v0.6.0;sha256sum=a7ec23e6dd529abf446fde9abe7f15481389ddc990c63f4967b6638682f350f1 \
+    gomod://github.com/yoke-project/yoke/proto;version=v0.7.0;sha256sum=ccee663415f4c7c936fbfdd23a557b2cf173bd2fd809efe58ba4c609c31e1a71 \
     gomod://go.yaml.in/yaml/v3;version=v3.0.5;sha256sum=f2d70caa35f66283aec58b889af8c5f07c374c5934be27a738c1215263e19205 \
     gomod://golang.org/x/net;version=v0.57.0;sha256sum=f8d652c629374b43846ef4f2efd419e8d1c81779eb728306d09f0de1cc1bab80 \
     gomod://golang.org/x/sys;version=v0.47.0;sha256sum=cdac013ddced0262926ec29ffcda645da39670e61c7e5b761e572b6b1809bb1b \
